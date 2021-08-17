@@ -56,12 +56,14 @@ library
     , universe-dependent-sum
     , wai-cors
     , warp
+    , hidapi >= 0.1.5
 
   exposed-modules:
       Desktop
     , Desktop.Crypto.BIP
     , Desktop.Frontend
     , Desktop.ImportExport
+    , Desktop.Ledger
     , Desktop.Orphans
     , Desktop.Setup
     , Desktop.Storage.File

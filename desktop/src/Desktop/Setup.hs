@@ -41,6 +41,7 @@ import System.FilePath (takeFileName)
 
 import Frontend.AppCfg (FileFFI(..), FileType(FileType_Import))
 import Desktop.ImportExport (doImport, Password(..), ImportWalletError(..))
+import Desktop.Ledger
 import Pact.Server.ApiClient (HasTransactionLogger, askTransactionLogger)
 import Frontend.Storage.Class (HasStorage)
 import Frontend.UI.Button
@@ -204,6 +205,7 @@ runSetup
     , HasStorage (Performable m)
     , MonadSample t (Performable m)
     , HasTransactionLogger m
+    , MonadIO m
     )
   => FileFFI t m
   -> Bool
@@ -242,7 +244,7 @@ splashLogo = do
     ) kadenaWalletLogo
 
 splashScreen
-  :: (DomBuilder t m, MonadFix m, MonadHold t m, PerformEvent t m
+  :: (DomBuilder t m, MonadFix m, MonadHold t m, PerformEvent t m, MonadIO m
      , PostBuild t m, MonadJSM (Performable m), TriggerEvent t m, HasStorage (Performable m)
      , MonadSample t (Performable m)
      , HasTransactionLogger m
@@ -269,7 +271,9 @@ splashScreen walletExists fileFFI eBack = selfWF
             disabledCfg = uiButtonCfg_disabled .~ fmap not agreed
             restoreCfg = uiButtonCfg_class <>~ "setup__restore-existing-button"
 
-        create <- confirmButton (def & disabledCfg ) "Create a new wallet"
+        create <- confirmButton (def & disabledCfg) "Create a new wallet"
+
+        setupLedger <- confirmButton (def & disabledCfg) "Use a ledger device"
 
         restoreBipPhrase <- uiButtonDyn (btnCfgSecondary & disabledCfg & restoreCfg)
           $ text "Restore from recovery phrase"
@@ -279,6 +283,7 @@ splashScreen walletExists fileFFI eBack = selfWF
 
         finishSetupWF WalletScreen_SplashScreen $ leftmost
           [ createNewWallet selfWF eBack <$ hasAgreed create
+          , setupLedgerWallet selfWF eBack <$ hasAgreed setupLedger
           , restoreBipWallet selfWF eBack <$ hasAgreed restoreBipPhrase
           , restoreFromImport walletExists fileFFI selfWF eBack <$ hasAgreed restoreImport
           ]
@@ -512,6 +517,26 @@ passphraseWidget
 passphraseWidget dWords dStage exposeEmpty = do
   setupDiv "passphrase-widget-wrapper" $
     listViewWithKey dWords (passphraseWordElement dStage exposeEmpty)
+
+setupLedgerWallet
+  :: forall t m. (MonadIO m, DomBuilder t m, MonadFix m, MonadHold t m, PerformEvent t m, PostBuild t m, MonadJSM (Performable m), TriggerEvent t m)
+  => SetupWF t m -> Event t () -> SetupWF t m
+setupLedgerWallet backWF eBack = selfWF
+  where
+    selfWF = Workflow $  do
+      ePb <- getPostBuild
+      elAttr "img" ("src" =: static @"img/Wallet_Graphic_2.png" <> "class" =: setupClass "password-bg") blank
+
+      mDeviceInfo <- liftIO getLedgerDeviceInfo
+      case mDeviceInfo of
+        Nothing -> text "No device"
+        Just deviceInfo -> do
+          ping <- setupDiv "continue-button" $ confirmButton def "Ping Ledger"
+          void $ runWithReplace blank $ ffor ping $ \_ -> do
+            result <- liftIO $ pingLedger deviceInfo
+            el "div" $ text $ tshow result
+
+      return ((WalletScreen_Done, never, never), never)
 
 createNewWallet
   :: forall t m. (DomBuilder t m, MonadFix m, MonadHold t m, PerformEvent t m, PostBuild t m, MonadJSM (Performable m), TriggerEvent t m)
