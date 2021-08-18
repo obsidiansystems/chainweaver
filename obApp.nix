@@ -83,11 +83,19 @@ in with obelisk;
             "--ghc-options=-optl=${pkgs.zlib.static}/lib/libz.a"
             "--ghc-options=-optl=${pkgs.gmp6.override { withStatic = true; }}/lib/libgmp.a"
             "--ghc-options=-optl=/usr/lib/libSystem.dylib"
+            "--ghc-options=-optl=${pkgs.hidapi}/lib/libhidapi.dylib" # TODO static
             "--ghc-options=-optl=${pkgs.libffi.override {
               stdenv = pkgs.stdenvAdapters.makeStaticLibraries pkgs.stdenv;
             }}/lib/libffi.a"
           ];
         });
+        # The nixpkgs one has systemd as a dependency, and removing it here
+        # doesn't seem to fix it. So we just callHackage ourselves.
+        hidapi = pkgs.haskell.lib.overrideCabal
+          (self.callHackage "hidapi" super.hidapi.version {})
+          (drv: {
+            libraryFrameworkDepends = [pkgs.darwin.apple_sdk.frameworks.AppKit];
+          });
       };
       linux-overlay = self: super: {
         gi-gtk-hs = self.callHackageDirect {
