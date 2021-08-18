@@ -159,5 +159,5 @@ pingLedger deviceInfo = runExceptT $ withDevice deviceInfo $ \device -> do
   bs <- liftIO $ HID.read device 64
   (readHeader, readPayload) <- parseTransport $ BSL.fromStrict bs
   return $ if readHeader == header && readPayload == payload
-  then PingResult_Ok
-  else PingResult_Failed
+    then PingResult_Ok
+    else PingResult_Failed
