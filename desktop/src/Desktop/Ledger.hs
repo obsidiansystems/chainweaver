@@ -14,10 +14,9 @@ import Data.Word
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Binary.Builder as Binary
 import qualified Data.Binary.Get as Binary
-import qualified System.USB as USB
 import qualified System.HIDAPI as HID
 
-vendorId :: USB.VendorId
+vendorId :: Word16
 vendorId = 0x2c97
 
 getLedgerDeviceInfo :: IO (Maybe HID.DeviceInfo)
