@@ -145,7 +145,9 @@ uiKeyDetails _keyIndex key _onCloseExternal = mdo
                 let
                   unsignedCmd = payloadToCommand payload
                   signCommand cmd signedHash = cmd  & cmdSigs .~ [signedHash]
-                withHeader "Signed Command" $ pure $ Right $ T.decodeUtf8 $ LB.toStrict $ A.encode $ _cmdHash unsignedCmd
+                  wrongHashJSAddle = T.decodeUtf8 $ LB.toStrict $ A.encode $ _cmdHash unsignedCmd
+                  wrongHashWithoutQuoting = T.decodeUtf8 $ LB.toStrict $ A.encode $ T.decodeUtf8 $ LB.toStrict $ A.encode payload
+                withHeader "Signed Command" $ pure $ Right $ wrongHashJSAddle <> "," <> wrongHashWithoutQuoting
               YamlSigData sigData@(SigData sdHash sigList (Just cmd)) -> do
                 let
                   -- `sigList` (that we parsed from user text) may or may not have all the signers.
