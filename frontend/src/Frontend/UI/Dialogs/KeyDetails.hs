@@ -145,15 +145,15 @@ uiKeyDetails _keyIndex key _onCloseExternal = mdo
                 let
                   unsignedCmd = payloadToCommand payload
                   signCommand cmd signedHash = cmd  & cmdSigs .~ [signedHash]
-                withHeader "Signed Command"
-                  $ fmap
-                    ( T.decodeUtf8
-                    . LB.toStrict
-                    . A.encode
-                    . signCommand unsignedCmd
-                    . UserSig
-                    )
-                  <$> signHashIfUserIsSigner (_cmdHash unsignedCmd) payload
+                withHeader "Signed Command" $ pure $ Right $ T.decodeUtf8 $ LB.toStrict $ A.encode $ _cmdHash unsignedCmd
+                  -- $ fmap
+                  --   ( T.decodeUtf8
+                  --   . LB.toStrict
+                  --   . A.encode
+                  --   . signCommand unsignedCmd
+                  --   . UserSig
+                  --   )
+                  -- <$> signHashIfUserIsSigner (_cmdHash unsignedCmd) payload
               YamlSigData sigData@(SigData sdHash sigList (Just cmd)) -> do
                 let
                   -- `sigList` (that we parsed from user text) may or may not have all the signers.
