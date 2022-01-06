@@ -32,7 +32,7 @@ import           Data.YAML
 import qualified Data.YAML.Aeson as Y
 import           Pact.Types.ChainMeta (PublicMeta)
 import           Pact.Types.Command
-import           Pact.Types.Hash (hash, toUntypedHash, unHash)
+import           Pact.Types.Hash (hash, pactHash, toUntypedHash, unHash)
 import           Pact.Types.SigData
 import           Pact.Types.Util             (decodeBase64UrlUnpadded)
 ------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ uiKeyDetails _keyIndex key _onCloseExternal = mdo
                   unsignedCmd = payloadToCommand payload
                   signCommand cmd signedHash = cmd  & cmdSigs .~ [signedHash]
                   wrongHashJSAddle = T.decodeUtf8 $ LB.toStrict $ A.encode $ _cmdHash unsignedCmd
-                  wrongHashWithoutQuoting = T.decodeUtf8 $ LB.toStrict $ A.encode $ T.decodeUtf8 $ LB.toStrict $ A.encode payload
+                  wrongHashWithoutQuoting = T.decodeUtf8 $ LB.toStrict $ A.encode $ T.decodeUtf8 $ unHash $ pactHash $ LB.toStrict $ A.encode payload
                 withHeader "Signed Command" $ pure $ Right $ wrongHashJSAddle <> "," <> wrongHashWithoutQuoting
               YamlSigData sigData@(SigData sdHash sigList (Just cmd)) -> do
                 let
