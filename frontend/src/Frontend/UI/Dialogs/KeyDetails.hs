@@ -146,7 +146,7 @@ uiKeyDetails _keyIndex key _onCloseExternal = mdo
                   unsignedCmd = payloadToCommand payload
                   signCommand cmd signedHash = cmd  & cmdSigs .~ [signedHash]
                   wrongHashJSAddle = T.decodeUtf8 $ LB.toStrict $ A.encode $ _cmdHash unsignedCmd
-                  wrongHashWithoutQuoting = T.decodeUtf8 $ LB.toStrict $ A.encode $ T.decodeUtf8 $ unHash $ pactHash $ LB.toStrict $ A.encode payload
+                  wrongHashWithoutQuoting = T.decodeUtf8 $ LB.toStrict $ A.encode $ pactHash $ LB.toStrict $ A.encode $ T.decodeUtf8 $ LB.toStrict $ A.encode payload
                 withHeader "Signed Command" $ pure $ Right $ wrongHashJSAddle <> "," <> wrongHashWithoutQuoting
               YamlSigData sigData@(SigData sdHash sigList (Just cmd)) -> do
                 let
