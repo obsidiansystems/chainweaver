@@ -33,6 +33,7 @@ import Frontend.Foundation
 import Frontend.ModuleExplorer.Impl (loadEditorFromLocalStorage)
 import Frontend.Storage
 import Frontend.Setup.Browser (bipWalletBrowser)
+import Frontend.WalletConnect.Internal (doInit)
 
 main :: IO ()
 main = do
@@ -75,6 +76,7 @@ frontend = Frontend
             , _fileFFI_deliverFile = \_ -> pure never
             }
           printResponsesHandler = pure $ FRPHandler never $ performEvent . fmap (liftIO . print)
+      walletConnectTestWidget
       bipWalletBrowser fileFFI $ \enabledSettings -> AppCfg
         { _appCfg_gistEnabled = False
         , _appCfg_loadEditor = loadEditorFromLocalStorage
@@ -84,6 +86,13 @@ frontend = Frontend
         , _appCfg_logMessage = errorLevelLogger
         }
   }
+
+walletConnectTestWidget = do
+  ev <- button "Init wallet connect"
+
+  input <- inputElement $ def
+  doInit (Just "ws://192.168.11.15") "some-project" (tag (current $ value input) ev)
+  pure ()
 
 -- | The 'JSM' action *must* be run from a user initiated event in order for the
 -- dialog to open
