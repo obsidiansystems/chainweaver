@@ -79,24 +79,35 @@ type Topic = Text
 
 data WalletConnectSession t m = WalletConnectSession
   { _walletConnectSession_active :: Dynamic t Bool
-  , _walletConnectSession_request :: Event t Text
+  , _walletConnectSession_request :: Event t (Text, Text, Text)
   , _walletConnectSession_respond :: Event t (Topic, Text) -> m (Event t ())
   }
 
-doInit :: (_) => Maybe Text -> Text -> Event t Text -> m (WalletConnectSession t m)
-doInit mRelayUrl projectId uriEv = do
+doInit :: (_)
+  => Maybe Text
+  -> Text
+  -> Event t ()
+  -> Event t Text
+  -> m (WalletConnectSession t m)
+doInit mRelayUrl projectId initEv uriEv = do
   (reqEv, reqAction) <- newTriggerEvent
 
   (sessionEv, sessionAction) <- newTriggerEvent
 
   clientMVar <- liftIO $ newEmptyMVar
 
-  performEvent $ ffor uriEv $ \uri -> liftJSM $ do
+  performEvent $ ffor initEv $ \_ -> liftJSM $ do
     cPromise <- clientInit mRelayUrl projectId
-    cPromise ^. js2 "then" (subscribeToEvents clientMVar reqAction sessionAction (doPair uri)) logValueF
+    cPromise ^. js2 "then" (subscribeToEvents clientMVar reqAction sessionAction) logValueF
+
+  performEvent $ ffor uriEv $ \uri -> liftJSM $ do
+    mClient <- liftIO $ tryReadMVar clientMVar
+    mapM (doPair uri) mClient
 
   sessionActive <- holdDyn False sessionEv
   display sessionActive
+  requests <- foldDyn (:) [] reqEv
+  display requests
   return $ WalletConnectSession sessionActive reqEv (\_ -> pure never)
 
 clientInit :: Maybe Text -> Text -> JSM JSVal
@@ -115,7 +126,7 @@ clientInit mRelayUrl projectId = do
   client ^. js1 "init" args
 
 -- subscribeToEvents :: JSVal -> JSM ()
-subscribeToEvents clientMVar reqAction sessionAction next = fun $ \_ _ [client] -> do
+subscribeToEvents clientMVar reqAction sessionAction = fun $ \_ _ [client] -> do
   logValue ("subscribeToEvents" :: Text)
   logValue client
 
@@ -149,8 +160,12 @@ subscribeToEvents clientMVar reqAction sessionAction next = fun $ \_ _ [client] 
   let onRequest = fun $ \_ _ [requestEvent] -> do
         logValue "onRequest"
         logValue requestEvent
-        req <- valToText =<< requestEvent ! "request"
-        liftIO $ reqAction req
+        j <- jsg "JSON"
+        c <- valToText =<< requestEvent ! "chainId"
+        t <- valToText =<< requestEvent ! "topic"
+        r <- requestEvent ! "request"
+        req <- valToText =<< j ^. js1  "stringify" r
+        liftIO $ reqAction (c, t, req)
 
   request <- session ! "request"
   client ^. js2 "on" request onRequest
@@ -167,9 +182,7 @@ subscribeToEvents clientMVar reqAction sessionAction next = fun $ \_ _ [client] 
         liftIO $ sessionAction False
 
   deleted <- session ! "deleted"
-  client ^. js2 "on" deleted onDelete
-
-  next client
+  void $ client ^. js2 "on" deleted onDelete
 
 doPair uri client = do
   logValue "doPair"

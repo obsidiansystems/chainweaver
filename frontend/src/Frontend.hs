@@ -88,10 +88,12 @@ frontend = Frontend
   }
 
 walletConnectTestWidget = do
-  ev <- button "Init wallet connect"
-
-  input <- inputElement $ def
-  doInit (Just "ws://192.168.11.15") "some-project" (tag (current $ value input) ev)
+  ev1 <- button "Init wallet connect"
+  uriInp <- inputElement $ def
+  ev2 <- button "Pair"
+  doInit (Just "ws://192.168.11.15") "some-project"
+    ev1
+    (tag (current $ value uriInp) ev2)
   pure ()
 
 -- | The 'JSM' action *must* be run from a user initiated event in order for the
