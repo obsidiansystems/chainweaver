@@ -24,7 +24,7 @@ import Obelisk.Frontend
 import Obelisk.Route.Frontend
 import Obelisk.Generated.Static
 import System.IO
-
+import Language.Javascript.JSaddle.Value (valToJSON)
 import Common.Api
 import Common.Route
 import Frontend.AppCfg
@@ -33,7 +33,7 @@ import Frontend.Foundation
 import Frontend.ModuleExplorer.Impl (loadEditorFromLocalStorage)
 import Frontend.Storage
 import Frontend.Setup.Browser (bipWalletBrowser)
-import Frontend.WalletConnect.Internal (doInit)
+import Frontend.WalletConnect.Internal (doInit, WalletConnectSession(..), WalletConnectResponse(..), WalletConnectRequest(..))
 
 main :: IO ()
 main = do
@@ -91,9 +91,17 @@ walletConnectTestWidget = do
   ev1 <- button "Init wallet connect"
   uriInp <- inputElement $ def
   ev2 <- button "Pair"
-  doInit (Just "ws://192.168.11.15") "some-project"
+  WalletConnectSession _ reqEv respond <- doInit (Just "ws://192.168.11.15") "some-project"
     ev1
     (tag (current $ value uriInp) ev2)
+  widgetHold blank $ ffor reqEv $ \req -> do
+    jsStr <- liftJSM $ valToJSON (_walletConnectRequest_params req)
+    ev <- button "respond"
+    text $ _walletConnectRequest_method req
+    text $ T.pack $ show jsStr
+    resp <- liftJSM $ Types.toJSVal $ ("0x00000abcdef" :: Text)
+    void $ respond ((WalletConnectResponse (_walletConnectRequest_topic req) (_walletConnectRequest_id req) resp) <$ ev)
+
   pure ()
 
 -- | The 'JSM' action *must* be run from a user initiated event in order for the

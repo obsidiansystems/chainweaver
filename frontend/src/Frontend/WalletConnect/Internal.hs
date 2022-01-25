@@ -75,12 +75,24 @@ logValue value = do
   w ^. js1 "log" value
   pure ()
 
-type Topic = Text
+data WalletConnectRequest = WalletConnectRequest
+  { _walletConnectRequest_topic :: Text
+  , _walletConnectRequest_id :: JSVal
+  , _walletConnectRequest_chainId :: Text
+  , _walletConnectRequest_method :: Text
+  , _walletConnectRequest_params :: JSVal
+  }
+
+data WalletConnectResponse = WalletConnectResponse
+  { _walletConnectResponse_topic :: Text
+  , _walletConnectResponse_id :: JSVal
+  , _walletConnectResponse_result :: JSVal
+  }
 
 data WalletConnectSession t m = WalletConnectSession
   { _walletConnectSession_active :: Dynamic t Bool
-  , _walletConnectSession_request :: Event t (Text, Text, Text)
-  , _walletConnectSession_respond :: Event t (Topic, Text) -> m (Event t ())
+  , _walletConnectSession_request :: Event t WalletConnectRequest
+  , _walletConnectSession_respond :: Event t WalletConnectResponse -> m (Event t ())
   }
 
 doInit :: (_)
@@ -106,9 +118,13 @@ doInit mRelayUrl projectId initEv uriEv = do
 
   sessionActive <- holdDyn False sessionEv
   display sessionActive
-  requests <- foldDyn (:) [] reqEv
-  display requests
-  return $ WalletConnectSession sessionActive reqEv (\_ -> pure never)
+
+  let
+    respond ev = performEvent $ ffor ev $ \v -> do
+      mClient <- liftIO $ tryReadMVar clientMVar
+      liftJSM $ mapM_ (doRespond v) mClient
+
+  return $ WalletConnectSession sessionActive reqEv respond
 
 clientInit :: Maybe Text -> Text -> JSM JSVal
 clientInit mRelayUrl projectId = do
@@ -160,12 +176,13 @@ subscribeToEvents clientMVar reqAction sessionAction = fun $ \_ _ [client] -> do
   let onRequest = fun $ \_ _ [requestEvent] -> do
         logValue "onRequest"
         logValue requestEvent
-        j <- jsg "JSON"
-        c <- valToText =<< requestEvent ! "chainId"
-        t <- valToText =<< requestEvent ! "topic"
-        r <- requestEvent ! "request"
-        req <- valToText =<< j ^. js1  "stringify" r
-        liftIO $ reqAction (c, t, req)
+        chainId <- valToText =<< requestEvent ! "chainId"
+        topic <- valToText =<< requestEvent ! "topic"
+        req <- requestEvent ! "request"
+        id' <- req ! "id"
+        method <- valToText =<< req ! "method"
+        params <- req ! "params"
+        liftIO $ reqAction (WalletConnectRequest topic id' chainId method params)
 
   request <- session ! "request"
   client ^. js2 "on" request onRequest
@@ -192,4 +209,21 @@ doPair uri client = do
     (o <# "uri") uri
     pure o
   void $ client ^. js1 "pair" args
-  pure ()
+
+doRespond :: WalletConnectResponse -> JSVal -> JSM ()
+doRespond (WalletConnectResponse topic id' result) client = do
+  logValue "doRespond"
+  logValue topic
+  args <- do
+    o <- create
+    (o <# "topic") topic
+    response <- do
+      o <- create
+      (o <# "result") result
+      (o <# "jsonrpc") ("2.0" :: Text)
+      (o <# "id") id'
+      pure o
+    (o <# "response") response
+    pure o
+  logValue args
+  void $ client ^. js1 "respond" args
