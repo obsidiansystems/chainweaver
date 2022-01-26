@@ -187,8 +187,9 @@ subscribeToEvents clientMVar reqAction sessionAction = fun $ \_ _ [client] -> do
   request <- session ! "request"
   client ^. js2 "on" request onRequest
 
-  let onCreate = fun $ \_ _ _ -> do
+  let onCreate = fun $ \_ _ [session] -> do
         logValue "onCreate"
+        logValue session
         liftIO $ sessionAction True
 
   created <- session ! "created"
@@ -200,6 +201,15 @@ subscribeToEvents clientMVar reqAction sessionAction = fun $ \_ _ [client] -> do
 
   deleted <- session ! "deleted"
   void $ client ^. js2 "on" deleted onDelete
+
+  let onSync = fun $ \_ _ _ -> do
+        logValue "onSync"
+        s <- client ! "session"
+        v <- s ! "values"
+        logValue v
+
+  sync <- session ! "sync"
+  void $ client ^. js2 "on" sync onSync
 
 doPair uri client = do
   logValue "doPair"
