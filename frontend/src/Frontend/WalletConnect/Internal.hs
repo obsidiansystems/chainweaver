@@ -170,7 +170,7 @@ clientInit mRelayUrl projectId = do
     (o <# "logger") ("debug" :: Text)
     -- The default specified in client (relay.wallet-connect.com) does not work
     -- so always specify one here.
-    (o <# "relayUrl") (fromMaybe "wss://bridge.walletconnect.org" mRelayUrl)
+    (o <# "relayUrl") (fromMaybe "wss://relay.walletconnect.org" mRelayUrl)
     (o <# "projectId") projectId
     (o <# "controller") True
     pure o
