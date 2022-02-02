@@ -205,6 +205,7 @@ main' ffi mainBundleResourcePath runHTML = do
                   , _appCfg_signingHandler = mkFRPHandler signingHandler
                   , _appCfg_enabledSettings = enabledSettings
                   , _appCfg_logMessage = _appFFI_global_logFunction ffi
+                  , _appCfg_walletConnect = Nothing
                   }
             _ <- mapRoutedT ( flip runTransactionLoggerT (logTransactionFile $ libPath </> commandLogFilename) .
                               runFileStorageT libPath

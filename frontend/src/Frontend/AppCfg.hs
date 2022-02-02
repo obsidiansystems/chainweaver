@@ -16,6 +16,7 @@ import Common.Logger (LogLevel, LogStr)
 import Common.Network (NetworkName)
 import Common.Wallet (Key, PublicKey)
 import Frontend.Crypto.Password
+import Frontend.WalletConnect.Internal (WalletConnect)
 
 data ChangePassword key t m = ChangePassword
   { _changePassword_requestChange :: Event t (Password, Password, Password) -> m (Event t (Either Text ()))
@@ -68,9 +69,10 @@ data AppCfg key t m = AppCfg
   -- ^ Initial code to load into editor
   , _appCfg_editorReadOnly :: Bool
   -- ^ Is the editor read only?
-  , _appCfg_signingHandler :: m (FRPHandler SigningRequest SigningResponse t m)
+  , _appCfg_signingHandler :: m (FRPHandler (Text, SigningRequest) (Text, SigningResponse) t m)
   , _appCfg_enabledSettings :: EnabledSettings key t m
   , _appCfg_logMessage :: LogLevel -> LogStr -> IO ()
+  , _appCfg_walletConnect :: Maybe (WalletConnect t)
   -- ^ Logging Function
   }
 

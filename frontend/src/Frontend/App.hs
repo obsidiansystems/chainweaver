@@ -74,6 +74,7 @@ import Frontend.UI.Transfer
 import Frontend.UI.Wallet
 import Frontend.UI.Widgets
 import Frontend.Wallet hiding (walletCfg)
+import Frontend.WalletConnect (walletConnectTopWidget)
 
 app
   :: forall js key t m.
@@ -156,6 +157,17 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
         mainCfg <- elClass "main" "main page__main" $ do
           uiSettings (_appCfg_enabledSettings appCfg) ideL fileFFI
         pure $ controlCfg <> mainCfg
+      FrontendRoute_WalletConnect -> do
+        controlCfg <- underNetworkBar "WalletConnect" (mempty <$ blank)
+        case _appCfg_walletConnect appCfg of
+          Nothing -> text "Wallet Connect is not available"
+          Just wc -> do
+            mUri <- askRoute >>= sample . current . fmap (\case
+              (FrontendRoute_WalletConnect :/ q) -> join $ Map.lookup "uri" q
+              _ -> Nothing)
+            walletConnectTopWidget wc mUri
+
+        pure controlCfg
 
     accountDatalist ideL
     keyDatalist ideL
@@ -230,6 +242,7 @@ routeIcon = \case
   FrontendRoute_Keys :/ _ -> static @"img/menu/keys.svg"
   FrontendRoute_Resources :/ _ -> static @"img/menu/resources.svg"
   FrontendRoute_Settings :/ _ -> static @"img/menu/settings.svg"
+  FrontendRoute_WalletConnect :/ _ -> static @"img/menu/settings.svg"
 
 -- | Code editing (left hand side currently)
 codePanel :: forall r key t m a. (MonadWidget t m, Routed t r m) => AppCfg key t m -> Dynamic t CssClass -> Ide a key t -> m (IdeCfg a key t)

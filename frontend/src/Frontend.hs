@@ -7,9 +7,12 @@
 {-# LANGUAGE RecursiveDo #-}
 module Frontend where
 
+import Control.Concurrent (newMVar, readMVar, modifyMVar_)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class
+import qualified Data.Aeson as Aeson
 import Data.Maybe (listToMaybe)
+import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified GHCJS.DOM.EventM as EventM
@@ -33,7 +36,7 @@ import Frontend.Foundation
 import Frontend.ModuleExplorer.Impl (loadEditorFromLocalStorage)
 import Frontend.Storage
 import Frontend.Setup.Browser (bipWalletBrowser)
-import Frontend.WalletConnect.Internal (doInit, WalletConnectSession(..), WalletConnectResponse(..), WalletConnectRequest(..))
+import Frontend.WalletConnect (doInit, WalletConnect(..), Request(..), Proposal(..))
 
 main :: IO ()
 main = do
@@ -76,33 +79,41 @@ frontend = Frontend
             , _fileFFI_deliverFile = \_ -> pure never
             }
           printResponsesHandler = pure $ FRPHandler never $ performEvent . fmap (liftIO . print)
-      walletConnectTestWidget
+      walletConnect <- doInit (Just "ws://192.168.11.15") "Kadena"
+      reqMap <- liftIO $ newMVar mempty
+      evM <- performEvent $ ffor (_walletConnect_requests walletConnect) $ \(t, req, reply) -> case Aeson.fromJSON (_request_params req) of
+        Aeson.Success r -> do
+          liftIO $ modifyMVar_ reqMap (\m -> pure $ M.insert t reply m)
+          pure $ Just (t, r)
+        Aeson.Error _ -> do
+          liftIO $ putStrLn "Could not decode SigningRequest"
+          pure Nothing
+      let signingHandler = pure $ FRPHandler reqEv respond
+          reqEv = fmapMaybe id evM
+          respond ev = performEvent $ ffor ev $ \v -> do
+            m <- liftIO $ readMVar reqMap
+            let doResp (t, r) = case M.lookup t m of
+                  Nothing -> liftIO $ putStrLn "Error: did not find topic in reqMap"
+                  Just resp -> liftJSM $ resp r
+            case v of
+              Left t -> doResp (t, Left ())
+              Right (t, r) -> doResp (t, Right $ Aeson.toJSON r)
+
+      performEvent $ ffor (_walletConnect_proposals walletConnect) $ \(Proposal t m p approve) -> do
+        liftIO $ putStrLn $ "Auto Approving : " <> T.unpack t
+        let accounts = ["eip155:42:0x8fd00f170fdf3772c5ebdcd90bf257316c69ba45"]
+        liftJSM $ approve $ Right accounts
+
       bipWalletBrowser fileFFI $ \enabledSettings -> AppCfg
         { _appCfg_gistEnabled = False
         , _appCfg_loadEditor = loadEditorFromLocalStorage
         , _appCfg_editorReadOnly = False
-        , _appCfg_signingHandler = printResponsesHandler
+        , _appCfg_signingHandler = signingHandler
         , _appCfg_enabledSettings = enabledSettings
         , _appCfg_logMessage = errorLevelLogger
+        , _appCfg_walletConnect = Just walletConnect
         }
   }
-
-walletConnectTestWidget = do
-  ev1 <- button "Init wallet connect"
-  uriInp <- inputElement $ def
-  ev2 <- button "Pair"
-  WalletConnectSession _ reqEv respond <- doInit (Just "ws://192.168.11.15") "some-project"
-    ev1
-    (tag (current $ value uriInp) ev2)
-  widgetHold blank $ ffor reqEv $ \req -> do
-    jsStr <- liftJSM $ valToJSON (_walletConnectRequest_params req)
-    ev <- button "respond"
-    text $ _walletConnectRequest_method req
-    text $ T.pack $ show jsStr
-    resp <- liftJSM $ Types.toJSVal $ ("0x00000abcdef" :: Text)
-    void $ respond ((WalletConnectResponse (_walletConnectRequest_topic req) (_walletConnectRequest_id req) resp) <$ ev)
-
-  pure ()
 
 -- | The 'JSM' action *must* be run from a user initiated event in order for the
 -- dialog to open

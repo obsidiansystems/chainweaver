@@ -78,12 +78,13 @@ widgetHoldWithRemoveAfterEvent wEv = do
   evDyn <- widgetHold (return never) (f1 <$> wEv)
   return $ (switch . current) evDyn
 
-walletConnectTopWidget (WalletConnect.WalletConnect sessions proposalEv _ doPair) uri = do
+walletConnectTopWidget (WalletConnect.WalletConnect sessions proposalEv _ doPair) mUri = do
 
-  rec
-    pairEv <- (switch . current) <$> widgetHold (button "Proceed with pairing?")
-      (return never <$ pairEv)
-  performEvent $ ffor pairEv $ \_ -> liftIO $ doPair uri
+  forM_ mUri $ \uri -> do
+    rec
+      pairEv <- (switch . current) <$> widgetHold (button "Proceed with pairing?")
+        (return never <$ pairEv)
+    performEvent $ ffor pairEv $ \_ -> liftIO $ doPair uri
 
   -- TODO: Is this proposal for the given URI?
   -- widgetHold (text "waiting") $ ffor proposalEv $ \(WalletConnect.Proposal t m p approve) -> do
@@ -94,8 +95,8 @@ walletConnectTopWidget (WalletConnect.WalletConnect sessions proposalEv _ doPair
   --   pure ()
 
   dyn $ ffor sessions $ \ss -> el "table" $ do
-    forM_ ss $ \session -> do
-      el "td" $ text $ _session_topic session
+    forM_ ss $ \session -> el "tr" $ do
+      el "td" $ text $ T.pack $ show $ _session_peer session
       ev <- el "td" $ button "disconnect"
       performEvent $ ffor ev $ \_ -> liftJSM $ WalletConnect._session_disconnect session
   pure ()

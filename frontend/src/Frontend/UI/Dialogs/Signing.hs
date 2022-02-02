@@ -7,6 +7,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Dialog presented for generating responses to signing API requests.
 -- Copyright   :  (C) 2020 Kadena
@@ -49,11 +50,11 @@ uiSigning
     , HasTransactionLogger m
     )
   => ModalIde m key t
-  -> (Event t (Either Text SigningResponse) -> m (Event t ()))
-  -> SigningRequest
+  -> (Event t (Either Text (Text, SigningResponse)) -> m (Event t ()))
+  -> (Text, SigningRequest)
   -> Event t ()
   -> m (mConf, Event t ())
-uiSigning ideL writeSigningResponse signingRequest onCloseExternal = do
+uiSigning ideL writeSigningResponse (topic, signingRequest) onCloseExternal = do
   onClose <- modalHeader $ text "Signing Request"
 
   (mConf, result, _) <- uiDeploymentSettings ideL $ DeploymentSettingsConfig
@@ -77,8 +78,8 @@ uiSigning ideL writeSigningResponse signingRequest onCloseExternal = do
   let response = deploymentResToResponse <$> result
 
   finished <- writeSigningResponse <=< headE $
-    maybe (Left "Cancelled") Right <$> leftmost
-      [ Just <$> response
+    maybe (Left topic) Right <$> leftmost
+      [ Just . (topic,) <$> response
       , Nothing <$ onCloseExternal
       , Nothing <$ onClose
       ]
