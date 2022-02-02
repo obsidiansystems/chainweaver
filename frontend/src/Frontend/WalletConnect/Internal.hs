@@ -100,14 +100,15 @@ data WalletConnect t = WalletConnect
   { _walletConnect_sessions :: Dynamic t (Map Topic Session)
   , _walletConnect_proposals :: Event t Proposal
   , _walletConnect_requests :: Event t (Topic, Request, Either () Aeson.Value -> JSM ())
+  , _walletConnect_pair :: Text -> IO ()
   }
 
 doInit :: (_)
   => Maybe Text -- Relay URL
   -> Text       -- Project Id
-  -> Event t Text -- URI
   -> m (WalletConnect t)
-doInit mRelayUrl projectId uriEv = do
+doInit mRelayUrl projectId = do
+  (uriEv, uriAction) <- newTriggerEvent
   (reqEv, reqAction) <- newTriggerEvent
   (sessionEv, sessionAction) <- newTriggerEvent
   (proposalEv, proposalAction) <- newTriggerEvent
@@ -132,7 +133,7 @@ doInit mRelayUrl projectId uriEv = do
           Just o -> pure (t,o)
           Nothing -> (t,) <$> makeSession client t s
 
-  return $ WalletConnect sessions proposalEv reqEv
+  return $ WalletConnect sessions proposalEv reqEv uriAction
 
 makeSession :: (MonadJSM m) => JSVal -> Text -> JSVal -> m Session
 makeSession client topic session = do
