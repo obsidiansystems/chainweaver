@@ -68,6 +68,7 @@ type Account = Text
 type Chain = Text
 type Method = Text
 type Topic = Text
+type PublicKey = Text
 
 data PeerMetadata = PeerMetadata
   { _peerMetadata_name :: Text
@@ -79,7 +80,7 @@ data PeerMetadata = PeerMetadata
 
 data Proposal = Proposal
   { _proposal_topic :: Topic
-  , _proposal_proposer :: PeerMetadata
+  , _proposal_proposer :: (PublicKey, PeerMetadata)
   , _proposal_permissions :: ([Chain], [Method])
   , _proposal_approval :: (Either () [Account] -> JSM ())
   }
@@ -93,7 +94,7 @@ data Request = Request
 data Session = Session
   { _session_topic :: Topic
   , _session_disconnect :: JSM ()
-  , _session_metadata :: PeerMetadata
+  , _session_peer :: (PublicKey, PeerMetadata)
   }
 
 data WalletConnect t = WalletConnect
@@ -153,14 +154,15 @@ makeSession client topic session = do
 
   return $ Session topic delete metadata
 
-getMetadata :: (MonadJSM m) => JSVal -> m PeerMetadata
+getMetadata :: (MonadJSM m) => JSVal -> m (PublicKey, PeerMetadata)
 getMetadata v = liftJSM $ do
+  pk <- valToText =<< v ! "publicKey"
   m <- v ! "metadata"
   n <- valToText =<< m ! "name"
   u <- valToText =<< m ! "url"
   i <- fromJSValUncheckedListOf =<< m ! "icons"
   d <- valToText =<< m ! "description"
-  return $ PeerMetadata n u i d
+  return $ (pk, PeerMetadata n u i d)
 
 clientInit :: Maybe Text -> Text -> JSM JSVal
 clientInit mRelayUrl projectId = do
