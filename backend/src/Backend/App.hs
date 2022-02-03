@@ -202,11 +202,15 @@ main' ffi mainBundleResourcePath runHTML = do
                   , _appCfg_loadEditor = loadEditorFromLocalStorage
                   -- DB 2019-08-07 Changing this back to False because it's just too convenient this way.
                   , _appCfg_editorReadOnly = False
-                  , _appCfg_signingHandler = mkFRPHandler signingHandler
+                  , _appCfg_signingHandler = signingHandler2
                   , _appCfg_enabledSettings = enabledSettings
                   , _appCfg_logMessage = _appFFI_global_logFunction ffi
                   , _appCfg_walletConnect = Nothing
                   }
+                signingHandler2 = do
+                  FRPHandler req res <- mkFRPHandler signingHandler
+                  pure $ FRPHandler ((\r -> ("", r)) <$> req) (\ev -> res (fmap snd <$> ev))
+
             _ <- mapRoutedT ( flip runTransactionLoggerT (logTransactionFile $ libPath </> commandLogFilename) .
                               runFileStorageT libPath
                             )
