@@ -7,7 +7,7 @@
 {-# LANGUAGE RecursiveDo #-}
 module Frontend where
 
-import Control.Concurrent (newMVar, readMVar, modifyMVar_)
+import Control.Concurrent (newMVar, readMVar, modifyMVar_, modifyMVar)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class
 import qualified Data.Aeson as Aeson
@@ -85,22 +85,28 @@ frontend = Frontend
         Aeson.Success r -> do
           liftIO $ modifyMVar_ reqMap (\m -> pure $ M.insert t reply m)
           pure $ Just (t, r)
-        Aeson.Error _ -> do
-          liftIO $ putStrLn "Could not decode SigningRequest"
+        Aeson.Error e -> do
+          liftIO $ putStrLn $ "Could not decode SigningRequest :" <> e
+          liftJSM $ reply $ Left ()
           pure Nothing
+
       let signingHandler = pure $ FRPHandler reqEv respond
           reqEv = fmapMaybe id evM
           respond ev = performEvent $ ffor ev $ \v -> do
             m <- liftIO $ readMVar reqMap
-            let doResp (t, r) = case M.lookup t m of
-                  Nothing -> liftIO $ putStrLn "Error: did not find topic in reqMap"
-                  Just resp -> liftJSM $ resp r
+            let doResp (t, r) = do
+                  mResp <- liftIO $ modifyMVar reqMap $ \m ->
+                    pure $ (M.delete t m, M.lookup t m)
+                  case mResp of
+                    Nothing -> liftIO $ putStrLn "Error: did not find topic in reqMap"
+                    Just resp -> liftJSM $ resp r
             case v of
               Left t -> doResp (t, Left ())
               Right (t, r) -> doResp (t, Right $ Aeson.toJSON r)
 
       performEvent $ ffor (_walletConnect_proposals walletConnect) $ \(Proposal t m p approve) -> do
         liftIO $ putStrLn $ "Auto Approving : " <> T.unpack t
+        -- The react-app require an account for the chain it currently supports, hence eip115:42
         let accounts = ["eip155:42:0x8fd00f170fdf3772c5ebdcd90bf257316c69ba45"]
         liftJSM $ approve $ Right accounts
 
