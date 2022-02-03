@@ -79,7 +79,7 @@ frontend = Frontend
             , _fileFFI_deliverFile = \_ -> pure never
             }
           printResponsesHandler = pure $ FRPHandler never $ performEvent . fmap (liftIO . print)
-      walletConnect <- doInit (Just "ws://192.168.11.15") "Kadena"
+      walletConnect <- doInit Nothing "Kadena"
       reqMap <- liftIO $ newMVar mempty
       evM <- performEvent $ ffor (_walletConnect_requests walletConnect) $ \(t, req, reply) -> case Aeson.fromJSON (_request_params req) of
         Aeson.Success r -> do
