@@ -278,7 +278,7 @@ runReq
   -> m (Either XhrException XhrResponse)
 runReq (SafeXhrRequest req) = do
   resp <- newEmptyMVar
-  void $ newXMLHttpRequestWithErrorSane req (liftIO . putMVar resp)
+  void $ newXMLHttpRequestWithError req (liftIO . putMVar resp)
   takeMVar resp
 
 

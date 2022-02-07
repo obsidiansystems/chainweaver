@@ -71,7 +71,7 @@ redirectPipes ps m = bracket setup hClose $ \r -> Async.withAsync (go r) $ \_ ->
     go r = forever $ hGetLine r >>= logToSyslog LevelInfo . toLogStr
 
 main :: IO ()
-main = sysloggedMain "Kadena Chainweaver" . redirectPipes [stderr, stdout] $
+main = -- sysloggedMain "Kadena Chainweaver" . redirectPipes [stderr, stdout] $
   main' ffi mainBundleResourcePath runMac
 
 runMac
