@@ -120,14 +120,15 @@ nodeVersion ni = case _nodeInfo_type ni of
 -- | Retrive the `NodeInfo` for a given host by quering its API.
 discoverNode :: forall m. (MonadJSM m, MonadUnliftIO m, HasJSContext m) => NodeRef -> m (Either Text NodeInfo)
 discoverNode (NodeRef auth) = do
-    httpsReqs <- async $ discoverChainwebOrPact httpsUri
-    httpReqs <- async $ discoverChainwebOrPact httpUri
+    -- httpsReqs <- async $ discoverChainwebOrPact httpsUri
+    -- httpReqs <- async $ discoverChainwebOrPact httpUri
 
     -- For some http only servers waiting for a https response will take ages
     -- on the other hand we need to prefer chainweb detection over pact -s
     -- detection (as the former is more reliable). Therefore we group them by
     -- protocol and go with the first success result.
-    waitSuccess [httpsReqs, httpReqs]
+    -- waitSuccess [httpsReqs, httpReqs]
+    discoverPactNode httpsUri
 
   where
     waitSuccess :: [Async (Either Text NodeInfo)] -> m (Either Text NodeInfo)
@@ -242,7 +243,8 @@ discoverPactNode baseUri = runExceptT $ do
     traceShowM $ _xhrResponse_status resp
     traceShowM $ _xhrResponse_statusText resp
     traceShowM $ _xhrResponse_responseText resp
-    when (_xhrResponse_status resp /= 200) $
+    when (_xhrResponse_status resp /= 200) $ do
+      traceM "\n--------\ndiscoverPactNode | before the throwError:"
       throwError $ "Received non 200 status: " <> tshow (_xhrResponse_status resp)
     pure $ NodeInfo
       { _nodeInfo_baseUri = baseUri
