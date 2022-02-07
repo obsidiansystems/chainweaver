@@ -141,7 +141,10 @@ discoverNode (NodeRef auth) = do
         case r of
           Left err -> do
             left ((err <> "\n\n") <>) <$> waitSuccess (filter (/= finished) xs)
-          Right success -> pure $ Right success
+          Right success -> do
+            mapM cancel xs
+            traceM "\n------\ndiscoverNode | waitSuccess | finished canceling\n\n"
+            pure $ Right success
 
     httpsUri = uriFromSchemeAuth [URI.scheme|https|]
     httpUri = uriFromSchemeAuth [URI.scheme|http|]
