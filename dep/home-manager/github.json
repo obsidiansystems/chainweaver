@@ -1,8 +1,8 @@
 {
-  "owner": "obsidiansystems",
+  "owner": "nix-community",
   "repo": "home-manager",
-  "branch": "aa/xdg-utils",
+  "branch": "release-20.09",
   "private": false,
-  "rev": "cfa8ef510801f5abe4c2b27401859e18c7e3b484",
-  "sha256": "130ljqsswyhxlbgsc061b5kfk7n0j1mvdq3m9qyda12sz6x84qik"
+  "rev": "f5395026bf5c77d83fff17152b1403d50c9f05f1",
+  "sha256": "1l1v4v8f36c99d98d6axn8bmh7m8a96bqrwidk8lqpp1znpyyrqn"
 }
