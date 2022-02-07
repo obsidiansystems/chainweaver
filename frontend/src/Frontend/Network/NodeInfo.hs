@@ -128,7 +128,9 @@ discoverNode (NodeRef auth) = do
     -- detection (as the former is more reliable). Therefore we group them by
     -- protocol and go with the first success result.
     -- waitSuccess [httpsReqs, httpReqs]
-    discoverPactNode httpsUri
+    httpsReqs <- async $ discoverPactNode httpsUri
+    waitSuccess [httpsReqs]
+
 
   where
     waitSuccess :: [Async (Either Text NodeInfo)] -> m (Either Text NodeInfo)
