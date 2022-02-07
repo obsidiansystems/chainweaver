@@ -79,6 +79,7 @@ import           Common.Network              (ChainId (..), ChainRef (..),
                                               NodeRef (..), parseNodeRef)
 import           Frontend.Foundation
 
+import Debug.Trace
 
 data ChainwebInfo = ChainwebInfo
   { _chainwebInfo_version        :: Text
@@ -234,7 +235,13 @@ discoverChainwebNode baseUri = runExceptT $ do
 discoverPactNode :: (MonadJSM m, HasJSContext m, MonadUnliftIO m) => NodeUri -> m (Either Text NodeInfo)
 discoverPactNode baseUri = runExceptT $ do
     req <- except $ mkSafeReq $ nodeToBaseUri baseUri & URI.uriPath .~ [ [URI.pathPiece|version|] ]
+    traceM "\n--------\ndiscoverPactNode | req:\n"
+    traceShowM req
     resp <- ExceptT . fmap (left tshow) $ runReq req
+    traceM "\n--------\ndiscoverPactNode | resp (fields):\n"
+    traceShowM $ _xhrResponse_status resp
+    traceShowM $ _xhrResponse_statusText resp
+    traceShowM $ _xhrResponse_responseText resp
     when (_xhrResponse_status resp /= 200) $
       throwError $ "Received non 200 status: " <> tshow (_xhrResponse_status resp)
     pure $ NodeInfo
@@ -310,7 +317,7 @@ newXMLHttpRequestWithErrorSane req cb =
 
    Possibly a bug in 'newXMLHttpRequestWithError': https://github.com/reflex-frp/reflex-dom/issues/369
 -}
-newtype SafeXhrRequest a = SafeXhrRequest (XhrRequest a)
+newtype SafeXhrRequest a = SafeXhrRequest (XhrRequest a) deriving Show
 
 mkSafeReq :: URI -> Either Text (SafeXhrRequest ())
 mkSafeReq uri = case uri ^. uriAuthority ^? _Right . authPort of
