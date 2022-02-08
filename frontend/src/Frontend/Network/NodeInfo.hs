@@ -58,6 +58,7 @@ import qualified Data.Aeson                  as Aeson
 import qualified Data.Aeson.Lens             as AL
 import           Data.Char                   (isDigit)
 import           Data.Default
+import           Data.Either                 (lefts, rights)
 import           Data.List                   (sortOn)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
@@ -128,13 +129,20 @@ discoverNode (NodeRef auth) = do
     -- detection (as the former is more reliable). Therefore we group them by
     -- protocol and go with the first success result.
     -- waitSuccess [httpsReqs, httpReqs]
-    traceM "\n------\nbefore pact"
     pactResponseHttps     <- discoverPactNode httpsUri
-    traceM "\n------\nbefore chainweb"
     chainwebResponseHttps <- discoverChainwebNode httpsUri
-    traceM "\n------\ndiscoverNode | after both"
+    pactResponseHttp      <- discoverPactNode httpUri
+    chainwebResponseHttp  <- discoverChainwebNode httpUri
 
-    pure $ chainwebResponseHttps
+    let allResponses = [chainwebResponseHttps, pactResponseHttps, chainwebResponseHttp, pactResponseHttp]
+
+    case rights allResponses of
+      [] ->
+        -- Since we didn't get a right response, we'll combine all the error messages
+        pure $ Left $ T.unlines $ lefts allResponses
+      (x:_) ->
+        -- We take the first good answer
+        pure (Right x)
 
   where
     waitSuccess :: [Async (Either Text NodeInfo)] -> m (Either Text NodeInfo)
