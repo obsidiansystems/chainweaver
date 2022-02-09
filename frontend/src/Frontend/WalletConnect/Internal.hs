@@ -257,6 +257,9 @@ subscribeToEvents clientMVar reqAction proposalAction sessionAction = fun $ \_ _
 
   let onSync = fun $ \_ _ _ -> do
         logValue "onSync"
+        readSessions
+
+      readSessions = do
         s <- client ! "session"
         v <- fromJSValUncheckedListOf =<< s ! "values"
         tp <- forM v $ \session -> do
@@ -264,6 +267,7 @@ subscribeToEvents clientMVar reqAction proposalAction sessionAction = fun $ \_ _
           pure (t, session)
         liftIO $ sessionAction tp
 
+  readSessions
   sync <- session ! "sync"
   void $ client ^. js2 "on" sync onSync
 
