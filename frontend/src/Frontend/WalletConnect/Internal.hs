@@ -244,16 +244,13 @@ subscribeToEvents clientMVar reqAction proposalAction sessionAction = fun $ \_ _
       params <- fromJSValUnchecked =<< req ! "params"
       let
         doSend v = do
-          result <- toJSVal v
-          doRespond client topic id' result
-        doReject _ = do
-          result <- toJSVal () -- confirm
+          result <- mapM toJSVal v
           doRespond client topic id' result
 
       liftIO $ reqAction
         ( topic
         , Request chainId method params
-        , either doReject doSend)
+        , doSend)
 
   request <- session ! "request"
   client ^. js2 "on" request onRequest
@@ -279,7 +276,7 @@ doPair uri client = do
     pure o
   void $ client ^. js1 "pair" args
 
-doRespond :: JSVal -> Topic -> JSVal -> JSVal -> JSM ()
+doRespond :: JSVal -> Topic -> JSVal -> Either () JSVal -> JSM ()
 doRespond client topic id' result = do
   logValue "doRespond"
   logValue topic
@@ -288,7 +285,9 @@ doRespond client topic id' result = do
     (o <# "topic") topic
     response <- do
       o <- create
-      (o <# "result") result
+      case result of
+        Left _ -> (o <# "error") ("JSONRPC_REQUEST_METHOD_REJECTED" :: Text)
+        Right v -> (o <# "result") v
       (o <# "jsonrpc") ("2.0" :: Text)
       (o <# "id") id'
       pure o
