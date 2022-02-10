@@ -122,7 +122,7 @@ doInit mRelayUrl projectId = do
       (subscribeToEvents clientMVar reqAction proposalAction sessionAction)
       logValueF -- TODO: handle errors
 
-  performEvent $ ffor uriEv $ \uri -> liftJSM $ do
+  performEvent $ ffor uriEv $ \uri -> liftJSM $ do -- use async
     client <- liftIO $ readMVar clientMVar -- TODO: timeout, Report error
     doPair uri client
 

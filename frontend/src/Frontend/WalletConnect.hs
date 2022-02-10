@@ -86,7 +86,6 @@ walletConnectTopWidget (WalletConnect.WalletConnect sessions proposalEv _ doPair
         (return never <$ pairEv)
     performEvent $ ffor pairEv $ \_ -> liftIO $ doPair uri
 
-  -- TODO: Is this proposal for the given URI?
   -- widgetHold (text "waiting") $ ffor proposalEv $ \(WalletConnect.Proposal t m p approve) -> do
   --   let accounts = ["eip155:42:0x8fd00f170fdf3772c5ebdcd90bf257316c69ba45"]
   --   ev1 <- (Right accounts <$) <$> button "approve"
@@ -94,9 +93,14 @@ walletConnectTopWidget (WalletConnect.WalletConnect sessions proposalEv _ doPair
   --   done <- performEvent $ ffor (leftmost [ev1, ev2]) (liftJSM . approve)
   --   pure ()
 
+  let showMetaData m = do
+        el "h4" $ text $ _peerMetadata_name m
+        el "p" $ text $ _peerMetadata_url m
+        el "p" $ text $ _peerMetadata_description m
+  el "h2" $ text "Sessions"
   dyn $ ffor sessions $ \ss -> el "table" $ do
     forM_ ss $ \session -> el "tr" $ do
-      el "td" $ text $ T.pack $ show $ _session_peer session
+      showMetaData $ snd $ _session_peer session
       ev <- el "td" $ button "disconnect"
       performEvent $ ffor ev $ \_ -> liftJSM $ WalletConnect._session_disconnect session
   pure ()
