@@ -107,7 +107,7 @@ frontend = Frontend
       performEvent $ ffor (_walletConnect_proposals walletConnect) $ \(Proposal t m p approve) -> do
         liftIO $ putStrLn $ "Auto Approving : " <> T.unpack t
         -- The react-app require an account for the chain it currently supports, hence eip115:42
-        let accounts = ["eip155:42:0x8fd00f170fdf3772c5ebdcd90bf257316c69ba45"]
+        let accounts = ["kadena:0:0x8fd00f170fdf3772c5ebdcd90bf257316c69ba45"]
         liftJSM $ approve $ Right accounts
 
       bipWalletBrowser fileFFI $ \enabledSettings -> AppCfg
