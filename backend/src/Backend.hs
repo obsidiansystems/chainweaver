@@ -243,7 +243,7 @@ requestToken (BackendCfg oAuthCfg (Just getSecret) manager) provId = do
   case errResp of
     Left err -> oAuthErrorToResponse err
     Right _ -> do
-      modifyResponse $ addHeader (CI.mk "cache-control") "no-cache, no-store, must-revalidate"
+      -- modifyResponse $ addHeader (CI.mk "cache-control") "no-cache, no-store, must-revalidate"
       writeLBS $ Aeson.encode errResp
 requestToken _ _ = oAuthErrorToResponse OAuthError_InvalidMethod
 
