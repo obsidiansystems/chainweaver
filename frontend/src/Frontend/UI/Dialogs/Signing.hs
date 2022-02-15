@@ -90,11 +90,10 @@ uiSigning
     , HasTransactionLogger m
     )
   => ModalIde m key t
-  -> (Event t (Either Text SigningResponse) -> m (Event t ()))
-  -> SigningRequest
+  -> (SigningRequest, Either Text SigningResponse -> JSM ())
   -> Event t ()
   -> m (mConf, Event t ())
-uiSigning ideL writeSigningResponse signingRequest onCloseExternal = do
+uiSigning ideL (signingRequest, writeSigningResponse) onCloseExternal = do
   onClose <- modalHeader $ text "Signing Request"
 
   (mConf, result, _) <- uiDeploymentSettings ideL $ DeploymentSettingsConfig
@@ -117,7 +116,7 @@ uiSigning ideL writeSigningResponse signingRequest onCloseExternal = do
 
   let response = deploymentResToResponse <$> result
 
-  finished <- writeSigningResponse <=< headE $
+  finished <- (performEvent . fmap (liftJSM . writeSigningResponse)) <=< headE $
     maybe (Left "Cancelled") Right <$> leftmost
       [ Just <$> response
       , Nothing <$ onCloseExternal
@@ -151,21 +150,21 @@ uiQuickSign
     , HasLogger model t
     )
   => model -- ModalIde m key t
-  -> (Event t (Either Text QuickSignResponse) -> m (Event t ()))
-  -> QuickSignRequest
+  -> (QuickSignRequest, Either Text QuickSignResponse -> JSM ())
   -> Event t ()
   -> m (mConf, Event t ())
-uiQuickSign ideL writeSigningResponse qsr _onCloseExternal = (mempty, ) <$> do
+uiQuickSign ideL (qsr, writeSigningResponse) _onCloseExternal = (mempty, ) <$> do
   let toPayReqOrErr txt = ffor (eitherDecodeStrict $ encodeUtf8 txt) $ \p ->
         flip PayloadSigningRequest p $ payloadToSigData p txt
   if _quickSignRequest_commands qsr == []
-     then writeSigningResponse =<< failWith "QuickSign request was empty" ""
+     then sendResp =<< failWith "QuickSign request was empty" ""
      else case partitionEithers $ fmap toPayReqOrErr $ _quickSignRequest_commands qsr of
        ([], payloads) ->
-         quickSignModal ideL writeSigningResponse payloads
-       (es, _) -> writeSigningResponse =<<
+         quickSignModal ideL sendResp payloads
+       (es, _) -> sendResp =<<
          failWith ("QuickSign request contained invalid commands:\n" <> T.unlines (map T.pack es)) ""
   where
+    sendResp = performEvent . fmap (liftJSM . writeSigningResponse)
 
 failWith :: MonadWidget t m => Text -> Text -> m (Event t (Either Text QuickSignResponse))
 failWith msgHeader msg = do
