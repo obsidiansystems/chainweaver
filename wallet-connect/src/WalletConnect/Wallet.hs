@@ -114,9 +114,9 @@ initWalletConnect mRelayUrl projectId = do
 
 makeSession :: (MonadJSM m) => JSVal -> JSVal -> m Session
 makeSession client session = do
-  -- liftJSM $ do
-  --   logValue "makeSession"
-  --   logValue session
+  liftJSM $ do
+    logValue "makeSession"
+    logValue session
   topic <- liftJSM $ valToText =<< session ! "topic"
   peer <- liftJSM $ getMetadataPublicKey =<< session ! "peer"
   let
