@@ -75,6 +75,7 @@ import Frontend.UI.Transfer
 import Frontend.UI.Wallet
 import Frontend.UI.Widgets
 import Frontend.Wallet hiding (walletCfg)
+import Frontend.WalletConnect
 
 app
   :: forall js key t m.
@@ -97,6 +98,8 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
   ideL <- makeIde fileFFI appCfg cfg
   signingReq <- _appCfg_signingHandler appCfg
   quickSignReq <- _appCfg_quickSignHandler appCfg
+  let mWalletConnect = _appCfg_walletConnect appCfg
+  mapM_ (handleWalletConnectPairings $ ideL ^. wallet_accounts) mWalletConnect
   sigPopup <- walletSidebar sidebarExtra
   updates <- divClass "page" $ do
     let mkPageContent c = divClass (c <> " page__content visible")
@@ -157,6 +160,16 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
         mainCfg <- elClass "main" "main page__main" $ do
           uiSettings (_appCfg_enabledSettings appCfg) ideL fileFFI
         pure $ controlCfg <> mainCfg
+      FrontendRoute_WalletConnect -> do
+        controlCfg <- underNetworkBar "WalletConnect" (mempty <$ blank)
+        case _appCfg_walletConnect appCfg of
+          Nothing -> text "Wallet Connect is not available"
+          Just wc -> do
+            mUri <- askRoute >>= sample . current . fmap (\case
+              (FrontendRoute_WalletConnect :/ q) -> join $ Map.lookup "uri" q
+              _ -> Nothing)
+            walletConnectTopWidget wc mUri
+        pure controlCfg
 
     accountDatalist ideL
     keyDatalist ideL
@@ -191,7 +204,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
     onGistCreatedModal = Just . uiCreatedGist <$> ideL ^. gistStore_created
     gistModalCfg = mempty & modalCfg_setModal .~ onGistCreatedModal
     onSigningModal = Just . uiSigning ideL <$> req
-    onQuickSignModal = Just . uiQuickSign ideL <$> ((qsr, const $ pure ()) <$ qreq) -- TODO: Fixme
+    onQuickSignModal = Just . uiQuickSign ideL <$> quickSignReq
     signingModalCfg = mempty & modalCfg_setModal .~ onSigningModal
     quickSignModalCfg = mempty & modalCfg_setModal .~ onQuickSignModal
 

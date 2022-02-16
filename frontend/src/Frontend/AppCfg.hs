@@ -11,6 +11,7 @@ import Language.Javascript.JSaddle (JSM, MonadJSM, liftJSM)
 
 import Kadena.SigningApi
 import Reflex
+import WalletConnect.Wallet
 
 import Common.Logger (LogLevel, LogStr)
 import Common.Network (NetworkName)
@@ -73,6 +74,7 @@ data AppCfg key t m = AppCfg
   , _appCfg_enabledSettings :: EnabledSettings key t m
   , _appCfg_logMessage :: LogLevel -> LogStr -> IO ()
   -- ^ Logging Function
+  , _appCfg_walletConnect :: Maybe (WalletConnect t)
   }
 
 data MVarHandler req res = MVarHandler
