@@ -254,6 +254,7 @@ routeIcon = \case
   FrontendRoute_Keys :/ _ -> static @"img/menu/keys.svg"
   FrontendRoute_Resources :/ _ -> static @"img/menu/resources.svg"
   FrontendRoute_Settings :/ _ -> static @"img/menu/settings.svg"
+  FrontendRoute_WalletConnect :/ _ -> static @"img/menu/settings.svg"
 
 -- | Code editing (left hand side currently)
 codePanel :: forall r key t m a. (MonadWidget t m, Routed t r m) => AppCfg key t m -> Dynamic t CssClass -> Ide a key t -> m (IdeCfg a key t)
