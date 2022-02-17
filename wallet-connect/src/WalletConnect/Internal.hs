@@ -113,7 +113,7 @@ doPair uri client = do
     o <- create
     (o <# "uri") uri
     pure o
-  void $ client ^. js1 "pair" args
+  client ^. js1 "pair" args
 
 doRequest :: JSVal -> Topic -> Request -> JSM JSVal
 doRequest client topic (Request chainId method params) = do

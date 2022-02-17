@@ -9,6 +9,7 @@ module WalletConnect.Wallet
   , Proposal (..)
   , WalletConnect (..)
   , initWalletConnect
+  , doNewPairing
   , module WalletConnect.Common
   )
   where
@@ -38,6 +39,7 @@ import           Language.Javascript.JSaddle
                                                 )
 import Reflex hiding (Request)
 import Reflex.Network
+import System.Timeout
 
 import WalletConnect.Common
 import WalletConnect.Internal
@@ -60,7 +62,7 @@ data WalletConnect t = WalletConnect
   , _walletConnect_sessions :: Dynamic t (Map Topic Session)
   , _walletConnect_proposals :: Event t Proposal
   , _walletConnect_requests :: Event t (Topic, Request, Either () A.Value -> JSM ())
-  , _walletConnect_pair :: Text -> IO ()
+  , _walletConnect_client :: MVar JSVal
   }
 
 initWalletConnect ::
@@ -76,7 +78,6 @@ initWalletConnect ::
   -> Text       -- Project Id
   -> m (WalletConnect t)
 initWalletConnect mRelayUrl projectId = do
-  (uriEv, uriAction) <- newTriggerEvent
   (reqEv, reqAction) <- newTriggerEvent
   (pairingsEv, pairingsAction) <- newTriggerEvent
   (sessionsEv, sessionsAction) <- newTriggerEvent
@@ -89,10 +90,6 @@ initWalletConnect mRelayUrl projectId = do
     clientPromise ^. js2 "then"
       (subscribeToEvents clientMVar reqAction proposalAction sessionsAction pairingsAction)
       logValueF -- TODO: handle errors
-
-  performEvent $ ffor uriEv $ \uri -> liftJSM $ do -- use async
-    client <- liftIO $ readMVar clientMVar -- TODO: timeout, Report error
-    doPair uri client
 
   rec
     pairings <- networkHold (pure mempty) $ ffor (attach (current pairings) pairingsEv) $ \(old, new) -> do
@@ -110,7 +107,24 @@ initWalletConnect mRelayUrl projectId = do
           Just o -> pure (t,o)
           Nothing -> (t,) <$> makeSession client s
 
-  return $ WalletConnect pairings sessions proposalEv reqEv uriAction
+  return $ WalletConnect pairings sessions proposalEv reqEv clientMVar
+
+doNewPairing :: (TriggerEvent t m, PerformEvent t m, MonadJSM (Performable m))
+  => WalletConnect t
+  -> Event t Text
+  -> m (Event t Bool)
+doNewPairing walletConnect uriEv = performEventAsync $ ffor uriEv $ \uri -> \res -> liftJSM $ do
+  mClient <- liftIO $ timeout fiveSec $ readMVar (_walletConnect_client walletConnect)
+  case mClient of
+    Nothing -> liftIO $ res False
+    Just client -> do
+      p <- doPair uri client
+      let resp b = fun $ \_ _ v -> do
+            -- logValue "Got pairing response"
+            -- logValue v
+            liftIO $ res b
+      void $ p ^. js2 "then" (resp True) (resp False)
+  where fiveSec = 5 * 1000 * 1000
 
 makeSession :: (MonadJSM m) => JSVal -> JSVal -> m Session
 makeSession client session = do
