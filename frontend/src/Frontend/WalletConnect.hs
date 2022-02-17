@@ -109,6 +109,14 @@ walletConnectTopWidget wc@(WalletConnect pairings sessions _ _ _) mUri = do
         el "p" $ text $ _metadata_url m
         el "p" $ text $ _metadata_description m
 
+  el "h2" $ text "Sessions"
+  dyn $ ffor sessions $ \ss -> el "table" $ do
+    forM_ ss $ \session -> el "tr" $ do
+      let m = snd $ _session_peer session
+      el "td" $ showMetaData m
+      ev <- el "td" $ button "disconnect"
+      performEvent $ ffor ev $ \_ -> liftJSM $ _session_disconnect session
+
   el "h2" $ text "Pairings"
   dyn $ ffor pairings $ \pp -> el "table" $ do
     forM_ pp $ \pairing -> el "tr" $ do
@@ -117,11 +125,4 @@ walletConnectTopWidget wc@(WalletConnect pairings sessions _ _ _) mUri = do
       ev2 <- el "td" $ button "Delete"
       performEvent $ ffor ev2 $ \_ -> liftJSM $ (_pairing_delete pairing)
 
-  el "h2" $ text "Sessions"
-  dyn $ ffor sessions $ \ss -> el "table" $ do
-    forM_ ss $ \session -> el "tr" $ do
-      let m = snd $ _session_peer session
-      el "td" $ showMetaData m
-      ev <- el "td" $ button "disconnect"
-      performEvent $ ffor ev $ \_ -> liftJSM $ _session_disconnect session
   pure ()
