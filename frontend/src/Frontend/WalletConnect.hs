@@ -83,13 +83,19 @@ handleWalletConnectPairings accounts walletConnect = do
 
     liftJSM $ approve $ Right accounts
 
-walletConnectTopWidget (WalletConnect pairings sessions proposalEv _ doPair) mUri = do
+walletConnectTopWidget wc@(WalletConnect pairings sessions _ _ _) mUri = do
 
   forM_ mUri $ \uri -> do
     rec
       pairEv <- (switch . current) <$> widgetHold (button "Proceed with pairing?")
         (return never <$ pairEv)
-    performEvent $ ffor pairEv $ \_ -> liftIO $ doPair uri
+    resultEv <- doNewPairing wc (uri <$ pairEv)
+    widgetHold_ blank $ ffor pairEv $ \_ -> do
+      widgetHold_ (text "Waiting for pairing to complete") $ ffor resultEv $ \case
+        True -> text "Pairing Succeeded"
+        False -> text "Pairing Failed"
+
+    pure ()
 
   -- widgetHold (text "waiting") $ ffor proposalEv $ \(WalletConnect.Proposal t m p approve) -> do
   --   let accounts = ["eip155:42:0x8fd00f170fdf3772c5ebdcd90bf257316c69ba45"]
