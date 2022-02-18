@@ -1,8 +1,8 @@
 {
-  "owner": "input-output-hk",
+  "owner": "obsidiansystems",
   "repo": "cardano-crypto",
-  "branch": "ghcjs-support",
+  "branch": "test-ghcjs-support",
   "private": false,
-  "rev": "1fff72e39e690676d4156a56858c6b72e1f0bff9",
-  "sha256": "06kahs46z842xndq3sgcrqyvmgvs05rnflbq76599pfnb2vspy2q"
+  "rev": "081f248947842d4279ad27d65932e2719b5620f7",
+  "sha256": "0g29p1z8g01xnkqxwl97dr088i9kp38cw8mfdg2qvqjjzj9x52ax"
 }
