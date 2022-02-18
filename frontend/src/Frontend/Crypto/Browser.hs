@@ -16,6 +16,8 @@ import Obelisk.Route.Frontend
 import Reflex.Dom hiding (fromJSString)
 import Reflex.Host.Class (MonadReflexCreateTrigger)
 
+import qualified Cardano.Crypto.Wallet as Crypto
+
 import qualified Control.Newtype.Generics as Newtype
 import Frontend.Crypto.Ed25519
 import Frontend.Crypto.Class
@@ -26,6 +28,7 @@ import Frontend.Storage
 import Pact.Server.ApiClient (HasTransactionLogger)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import Data.Either (fromRight)
 
 newtype BrowserCryptoT t m a = BrowserCryptoT
@@ -45,10 +48,11 @@ newtype BrowserCryptoT t m a = BrowserCryptoT
     )
 
 instance (MonadJSM m, MonadSample t m) => HasCrypto PrivateKey (BrowserCryptoT t m) where
-  cryptoSign msg key = do
-    (_, p) <- sample =<< ask
-    sigOrErr <- mkSignature p msg key
-    pure $ fromRight (Signature "") sigOrErr
+  cryptoSign msg (PrivateKey key) = do
+    (_, Password pass) <- sample =<< ask
+    pure $ Signature $ case Crypto.xprv key of
+      Left _ -> "Man"
+      Right k -> Crypto.unXSignature $ Crypto.sign (T.encodeUtf8 pass) k msg
   cryptoVerify = verifySignature
   cryptoGenKey i = BrowserCryptoT $ do
     (root, p) <- sample =<< ask

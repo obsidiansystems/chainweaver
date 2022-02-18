@@ -1,8 +1,8 @@
 {
-  "owner": "kadena-io",
+  "owner": "input-output-hk",
   "repo": "cardano-crypto",
-  "branch": "master",
+  "branch": "ghcjs-support",
   "private": false,
-  "rev": "4590efa638397e952a51a8994b5543e4ea3c1ecd",
-  "sha256": "0hl2n3bba5v2j0lmxhs7hs01z3aznh2bwf9cb434icq2g0bl8ms3"
+  "rev": "1fff72e39e690676d4156a56858c6b72e1f0bff9",
+  "sha256": "06kahs46z842xndq3sgcrqyvmgvs05rnflbq76599pfnb2vspy2q"
 }
