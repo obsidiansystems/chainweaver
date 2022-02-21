@@ -61,29 +61,42 @@ frontend = Frontend
         ]
 
       base <- getConfigRoute
-      _ <- newHead $ \r -> base <> renderBackendRoute backendEncoder r
+      newHead $ \r -> base <> renderBackendRoute backendEncoder r
       pure ()
 
-  , _frontend_body = prerender_ loaderMarkup $ do
-    liftIO $ hSetBuffering stderr LineBuffering
-    liftIO $ hSetBuffering stdout LineBuffering
-    (fileOpened, triggerOpen) <- openFileDialog
-    mapRoutedT (flip runTransactionLoggerT noLogger . runBrowserStorageT) $ do
-      let fileFFI = FileFFI
-            { _fileFFI_externalFileOpened = fileOpened
-            , _fileFFI_openFileDialog = liftJSM . triggerOpen
-            , _fileFFI_deliverFile = \_ -> pure never
-            }
-          printResponsesHandler = pure $ FRPHandler never $ performEvent . fmap (liftIO . print)
-      bipWalletBrowser fileFFI $ \enabledSettings -> AppCfg
-        { _appCfg_gistEnabled = False
-        , _appCfg_loadEditor = loadEditorFromLocalStorage
-        , _appCfg_editorReadOnly = False
-        , _appCfg_signingHandler = printResponsesHandler
-        , _appCfg_enabledSettings = enabledSettings
-        , _appCfg_logMessage = errorLevelLogger
-        }
+  , _frontend_body = do
+    js "/static/js/ace/ace.js"
+    prerender_ blank $ js "/static/js/ace/mode-pact.js"
+    -- Allows importing private keys
+    js (static @"js/nacl-fast.min-v1.0.0.js")
+    -- Allows for BIP39-based key generation and encrypted storage of private keys
+    js (static @"js/kadena-crypto.js")
+    js (static @"js/bowser.min.js")
+    prerender_ loaderMarkup $ do
+      liftIO $ hSetBuffering stderr LineBuffering
+      liftIO $ hSetBuffering stdout LineBuffering
+      (fileOpened, triggerOpen) <- openFileDialog
+      mapRoutedT (flip runTransactionLoggerT noLogger . runBrowserStorageT) $ do
+        let fileFFI = FileFFI
+              { _fileFFI_externalFileOpened = fileOpened
+              , _fileFFI_openFileDialog = liftJSM . triggerOpen
+              , _fileFFI_deliverFile = \_ -> pure never
+              }
+            printResponsesHandler = pure $ FRPHandler never $ performEvent . fmap (liftIO . print)
+        bipWalletBrowser fileFFI $ \enabledSettings -> AppCfg
+          { _appCfg_gistEnabled = False
+          , _appCfg_loadEditor = loadEditorFromLocalStorage
+          , _appCfg_editorReadOnly = False
+          , _appCfg_signingHandler = printResponsesHandler
+          , _appCfg_enabledSettings = enabledSettings
+          , _appCfg_logMessage = errorLevelLogger
+          }
   }
+  where
+    js :: forall t n. DomBuilder t n => Text -> n ()
+    js = void . js'
+    js' :: forall t n. DomBuilder t n => Text -> n (Element EventResult (DomBuilderSpace n) t, ())
+    js' url = elAttr' "script" ("type" =: "text/javascript" <> "src" =: url <> "charset" =: "utf-8") blank
 
 -- | The 'JSM' action *must* be run from a user initiated event in order for the
 -- dialog to open
@@ -123,7 +136,7 @@ loaderMarkup = divClass "spinner" $ do
     divClass "cube2" blank
   divClass "spinner__msg" $ text "Loading"
 
-newHead :: (Prerender js t m, DomBuilder t m) => (R BackendRoute -> Text) -> m (Event t ())
+newHead :: (Prerender js t m, DomBuilder t m) => (R BackendRoute -> Text) -> m ()
 newHead routeText = do
   el "title" $ text "(BETA) Kadena Chainweaver: Wallet & IDE"
   elAttr "link" ("rel" =: "icon" <> "type" =: "image/png" <> "href" =: static @"img/favicon/favicon-96x96.png") blank
@@ -139,19 +152,7 @@ newHead routeText = do
   ss "https://fonts.googleapis.com/css?family=Work+Sans"
   ss (static @"css/font-awesome.min.css")
   ss (static @"css/ace-theme-chainweaver.css")
-  js "/static/js/ace/ace.js"
-  prerender_ blank $ js "/static/js/ace/mode-pact.js"
-  -- Allows importing private keys
-  js (static @"js/nacl-fast.min-v1.0.0.js")
-  -- Allows for BIP39-based key generation and encrypted storage of private keys
-  js (static @"js/kadena-crypto.js")
-  (bowser, _) <- js' (static @"js/bowser.min.js")
-  pure $ domEvent Load bowser
   where
-    js :: forall t n. DomBuilder t n => Text -> n ()
-    js = void . js'
-    js' :: forall t n. DomBuilder t n => Text -> n (Element EventResult (DomBuilderSpace n) t, ())
-    js' url = elAttr' "script" ("type" =: "text/javascript" <> "src" =: url <> "charset" =: "utf-8") blank
     ss url = elAttr "link" ("href" =: url <> "rel" =: "stylesheet") blank
     meta attrs = elAttr "meta" attrs blank
 
