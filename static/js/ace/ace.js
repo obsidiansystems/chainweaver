@@ -4,13 +4,14 @@
                         a.config.init(true);
                         a.define = window.define;
                     }
-                    if (!window.ace)
-                        window.ace = a;
+                    window.Chainweaver = window.Chainweaver || {};
+                    if (!window.Chainweaver.ace)
+                        window.Chainweaver.ace = a;
                     for (var key in a) if (a.hasOwnProperty(key))
-                        window.ace[key] = a[key];
-                    window.ace["default"] = window.ace;
+                        window.Chainweaver.ace[key] = a[key];
+                    window.Chainweaver.ace["default"] = window.Chainweaver.ace;
                     if (typeof module == "object" && typeof exports == "object" && module) {
-                        module.exports = window.ace;
+                        module.exports = window.Chainweaver.ace;
                     }
                 });
             })();

@@ -1,4 +1,4 @@
-ace.define("ace/mode/folding/pact", ["require", "exports", "module", "ace/lib/oop", "ace/range", "ace/mode/folding/fold_mode"], function(e, t, n) {
+Chainweaver.ace.define("ace/mode/folding/pact", ["require", "exports", "module", "ace/lib/oop", "ace/range", "ace/mode/folding/fold_mode"], function(e, t, n) {
     "use strict";
     var r = e("../../lib/oop"),
         i = e("../../range").Range,
@@ -41,7 +41,7 @@ ace.define("ace/mode/folding/pact", ["require", "exports", "module", "ace/lib/oo
                 if (l > o) return new i(o, r, l, 0);
             }
         }.call(o.prototype)
-}), ace.define("ace/mode/pact", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/tokenizer", "ace/mode/pact_highlight_rules", "ace/mode/matching_parens_outdent", "ace/range"], function(e, t, n) {
+}), Chainweaver.ace.define("ace/mode/pact", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/tokenizer", "ace/mode/pact_highlight_rules", "ace/mode/matching_parens_outdent", "ace/range"], function(e, t, n) {
     var r = e("../lib/oop"),
         i = e("./text").Mode,
         s = e("../tokenizer").Tokenizer,
@@ -70,7 +70,7 @@ ace.define("ace/mode/folding/pact", ["require", "exports", "module", "ace/lib/oo
                 this.$outdent.autoOutdent(t, n)
             }
         }.call(f.prototype), t.Mode = f
-}), ace.define("ace/mode/pact_highlight_rules", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text_highlight_rules"], function(e, t, n) {
+}), Chainweaver.ace.define("ace/mode/pact_highlight_rules", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text_highlight_rules"], function(e, t, n) {
     var r = e("../lib/oop"),
         i = e("./text_highlight_rules").TextHighlightRules,
         s = function() {
@@ -154,7 +154,7 @@ ace.define("ace/mode/folding/pact", ["require", "exports", "module", "ace/lib/oo
             }
         };
     r.inherits(s, i), t.PactHighlightRules = s
-}), ace.define("ace/mode/matching_parens_outdent", ["require", "exports", "module", "ace/range"], function(e, t, n) {
+}), Chainweaver.ace.define("ace/mode/matching_parens_outdent", ["require", "exports", "module", "ace/range"], function(e, t, n) {
     var r = e("../range").Range,
         i = function() {};
     (function() {
