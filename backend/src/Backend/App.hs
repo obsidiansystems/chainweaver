@@ -181,15 +181,13 @@ main' ffi mainBundleResourcePath runHTML = do
             , "Testnet: api.testnet.chainweb.com"
             ]
       liftIO $ putStrLn "Starting frontend"
-      bowserMVar :: MVar () <- liftIO newEmptyMVar
       -- Run real obelisk frontend
       runFrontendWithConfigsAndCurrentRoute frontendMode configs backendEncoder $ Frontend
         -- TODO we shouldn't have to use prerender since we aren't hydrating
         { _frontend_head = prerender_ blank $ do
-          bowserLoad <- newHead $ \r -> T.pack $ T.unpack route </> T.unpack (renderBackendRoute backendEncoder r)
-          performEvent_ $ liftIO . putMVar bowserMVar <$> bowserLoad
+          newHead $ \r -> T.pack $ T.unpack route </> T.unpack (renderBackendRoute backendEncoder r)
         , _frontend_body = prerender_ blank $ do
-            bowserLoad <- takeMVarTriggerEvent bowserMVar
+            bowserLoad <- newBody
             fileOpened <- takeMVarTriggerEvent fileOpenedMVar
 
             let fileFFI = FileFFI

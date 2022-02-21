@@ -65,13 +65,7 @@ frontend = Frontend
       pure ()
 
   , _frontend_body = do
-    js "/static/js/ace/ace.js"
-    prerender_ blank $ js "/static/js/ace/mode-pact.js"
-    -- Allows importing private keys
-    js (static @"js/nacl-fast.min-v1.0.0.js")
-    -- Allows for BIP39-based key generation and encrypted storage of private keys
-    js (static @"js/kadena-crypto.js")
-    js (static @"js/bowser.min.js")
+    newBody
     prerender_ loaderMarkup $ do
       liftIO $ hSetBuffering stderr LineBuffering
       liftIO $ hSetBuffering stdout LineBuffering
@@ -92,11 +86,6 @@ frontend = Frontend
           , _appCfg_logMessage = errorLevelLogger
           }
   }
-  where
-    js :: forall t n. DomBuilder t n => Text -> n ()
-    js = void . js'
-    js' :: forall t n. DomBuilder t n => Text -> n (Element EventResult (DomBuilderSpace n) t, ())
-    js' url = elAttr' "script" ("type" =: "text/javascript" <> "src" =: url <> "charset" =: "utf-8") blank
 
 -- | The 'JSM' action *must* be run from a user initiated event in order for the
 -- dialog to open
@@ -168,6 +157,22 @@ newHead routeText = do
         bgImg src = "background-image: url(" <> src <> "); background-position: left center"
         alertImg sel src = sel <> " { " <> bgImg src <> " } ";
         (w,h) = minWindowSize
+
+newBody :: (DomBuilder t m, Prerender js t m) => m (Event t ())
+newBody = do
+  js "/static/js/ace/ace.js"
+  prerender_ blank $ js "/static/js/ace/mode-pact.js"
+  -- Allows importing private keys
+  js (static @"js/nacl-fast.min-v1.0.0.js")
+  -- Allows for BIP39-based key generation and encrypted storage of private keys
+  js (static @"js/kadena-crypto.js")
+  (bowser, _) <- js' (static @"js/bowser.min.js")
+  pure $ domEvent Load bowser
+  where
+    js :: forall t n. DomBuilder t n => Text -> n ()
+    js = void . js'
+    js' :: forall t n. DomBuilder t n => Text -> n (Element EventResult (DomBuilderSpace n) t, ())
+    js' url = elAttr' "script" ("type" =: "text/javascript" <> "src" =: url <> "charset" =: "utf-8") blank
 
 minWindowSize :: (Int, Int)
 minWindowSize = (800, 600)
