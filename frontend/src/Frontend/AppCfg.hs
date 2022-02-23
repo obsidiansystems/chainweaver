@@ -3,6 +3,7 @@
 module Frontend.AppCfg where
 
 import Control.Concurrent (MVar, forkIO, newEmptyMVar, putMVar, takeMVar, threadDelay, tryReadMVar)
+import Control.Concurrent.Chan
 import Control.Monad (forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Map (Map)
@@ -17,6 +18,7 @@ import Common.Logger (LogLevel, LogStr)
 import Common.Network (NetworkName)
 import Common.Wallet (Key, PublicKey)
 import Frontend.Crypto.Password
+import Frontend.Foundation
 
 data ChangePassword key t m = ChangePassword
   { _changePassword_requestChange :: Event t (Password, Password, Password) -> m (Event t (Either Text ()))
@@ -114,3 +116,20 @@ tryReadMVarTriggerEvent mvar = do
     trigger =<< tryReadMVar mvar
     threadDelay (seconds 1)
   pure $ fmapMaybe id e
+
+mkBufferedFRPHandler
+  :: (PerformEvent t m, MonadJSM m, TriggerEvent t m, MonadIO (Performable m))
+  => FRPHandler req res t -> m (m (FRPHandler req res t))
+mkBufferedFRPHandler ev = do
+  reqQueue <- liftIO newChan
+  performEvent $ ffor ev $ \v -> liftIO $ writeChan reqQueue v
+  pure $ do
+    readReq <- liftIO $ newEmptyMVar
+    writeResp <- liftIO $ newEmptyMVar
+    liftJSM $ forkJSM $ forever $ do
+      (req, respond) <- liftIO $ readChan reqQueue
+      resp <- liftIO $ do
+        putMVar readReq req
+        takeMVar writeResp
+      respond resp
+    mkFRPHandler (MVarHandler readReq writeResp)
