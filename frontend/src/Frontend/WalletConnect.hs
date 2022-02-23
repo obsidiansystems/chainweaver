@@ -32,8 +32,8 @@ import Common.Wallet
 
 setupWalletConnect :: (_)
   => m (WalletConnect t
-     , (FRPHandler SigningRequest SigningResponse t)
-     , (FRPHandler QuickSignRequest QuickSignResponse t)
+     , m (FRPHandler SigningRequest SigningResponse t)
+     , m (FRPHandler QuickSignRequest QuickSignResponse t)
      )
 setupWalletConnect = do
   walletConnect <- initWalletConnect Nothing "Kadena"
@@ -49,19 +49,22 @@ setupWalletConnect = do
           A.Error e2 -> Left (e1, e2)
     sucEv = fmapMaybe (either (const Nothing) Just) ev
     errEv = fmapMaybe (either Just (const Nothing)) ev
-    signingHandler = fmapMaybe (either Just (const Nothing)) sucEv
-    quickSignHandler = fmapMaybe (either (const Nothing) Just) sucEv
+    signingEv = fmapMaybe (either Just (const Nothing)) sucEv
+    quickSignEv = fmapMaybe (either (const Nothing) Just) sucEv
 
   performEvent $ ffor (_walletConnect_requests walletConnect) $ \(t, req, reply) -> liftIO $ do
     putStrLn $ "Recieved request"
     putStrLn $ show $ _request_params req
 
-  performEvent $ ffor quickSignHandler $ \(r, _) -> liftIO $ do
+  performEvent $ ffor quickSignEv $ \(r, _) -> liftIO $ do
     putStrLn $ "Recieved quicksign request"
     putStrLn $ show $ _quickSignRequest_commands r
   performEvent $ ffor errEv $ \(e1, e2) -> liftIO $ do
     putStrLn $ "Error in request decoding: e1: " <> e1
     putStrLn $ "Error in request decoding: e2: " <> e2
+
+  signingHandler <- mkBufferedFRPHandler signingEv
+  quickSignHandler <- mkBufferedFRPHandler quickSignEv
 
   pure (walletConnect, signingHandler, quickSignHandler)
 

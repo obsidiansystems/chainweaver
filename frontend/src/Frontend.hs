@@ -9,6 +9,7 @@ module Frontend where
 
 import Control.Monad (join, void)
 import Control.Monad.IO.Class
+import Control.Monad.Morph (lift)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -83,8 +84,8 @@ frontend = Frontend
         { _appCfg_gistEnabled = False
         , _appCfg_loadEditor = loadEditorFromLocalStorage
         , _appCfg_editorReadOnly = False
-        , _appCfg_quickSignHandler = pure quickSignHandler
-        , _appCfg_signingHandler = pure signingHandler
+        , _appCfg_quickSignHandler = mapRoutedT lift quickSignHandler
+        , _appCfg_signingHandler = mapRoutedT lift signingHandler
         , _appCfg_enabledSettings = enabledSettings
         , _appCfg_logMessage = errorLevelLogger
         , _appCfg_walletConnect = Just walletConnect
