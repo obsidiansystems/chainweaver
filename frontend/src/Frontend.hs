@@ -80,7 +80,7 @@ frontend = Frontend
 
       (walletConnect, signingHandler, quickSignHandler) <-
         setupWalletConnect
-      bipWalletBrowser fileFFI $ \enabledSettings -> AppCfg
+      bipWalletBrowser fileFFI walletConnect $ \enabledSettings -> AppCfg
         { _appCfg_gistEnabled = False
         , _appCfg_loadEditor = loadEditorFromLocalStorage
         , _appCfg_editorReadOnly = False

@@ -13,7 +13,6 @@
 module Frontend.Setup.Browser (runSetup, bipWalletBrowser) where
 
 import Control.Lens ((<>~), (^.), _1, _2, _3)
-import Control.Monad (guard)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.Trans (lift)
 import Control.Monad
@@ -33,6 +32,7 @@ import Reflex.Dom.Core hiding (Key)
 import Pact.Server.ApiClient (HasTransactionLogger, askTransactionLogger, _transactionLogger_rotateLogFile)
 import Obelisk.Route.Frontend
 import Obelisk.Generated.Static
+import WalletConnect.Wallet
 import Common.Wallet
 import Common.Route
 import qualified Frontend.App as App (app)
@@ -154,9 +154,10 @@ bipWalletBrowser
      , MonadJSM (Performable m)
      )
   => FileFFI t m
+  -> WalletConnect t
   -> MkAppCfg t m
   -> RoutedT t (R FrontendRoute) m ()
-bipWalletBrowser fileFFI mkAppCfg = do
+bipWalletBrowser fileFFI walletConnect mkAppCfg = do
   txLogger <- askTransactionLogger
   let
     changePasswordBrowserAction i newRoot newPass = do
@@ -198,7 +199,8 @@ bipWalletBrowser fileFFI mkAppCfg = do
       LockScreen_RunSetup :=> _ -> runSetup0 Nothing WalletExists_No
       -- Wallet exists but the lock screen is active
       LockScreen_Locked :=> Compose root -> do
-        (restore, mLogin) <- lockScreenWidget $ fmap runIdentity $ current root
+        let signingReqEv = () <$ _walletConnect_requests walletConnect
+        (restore, mLogin) <- lockScreenWidget signingReqEv passwordRoundTripTest $ fmap runIdentity $ current root
         pure $ leftmost
           [ (LockScreen_Restore ==>) . runIdentity <$> current root <@ restore
           , (LockScreen_Unlocked ==>) <$> attach (runIdentity <$> current root) mLogin
@@ -260,20 +262,6 @@ appSettingsBrowser newPwdTrigger details keyUpdates changePasswordBrowserAction 
                 setItemStorage localStorage BIPStorage_RootKey newRoot
                 liftIO $ newPwdTrigger (newRoot, newPass)
                 pure $ Right ()
-
-lockScreenWidget
-  ::
-  (DomBuilder t m, PostBuild t m, TriggerEvent t m, PerformEvent t m,
-   MonadIO m, MonadFix m, MonadHold t m, MonadJSM (Performable m)
-  )
-  => Behavior t PrivateKey -> m (Event t (), Event t Password)
-lockScreenWidget xprv = setupDiv "fullscreen" $ divClass "wrapper" $ setupDiv "splash" $ mdo
-  (restore, pass, eSubmit) <- lockScreen isValid
-  let prvAndPass = (,) <$> xprv <*> (fmap Password $ current pass)
-  isValid <- performEvent $ ffor (attach prvAndPass eSubmit) $ \((xprv', pass'), _) -> do
-    isMatch <- passwordRoundTripTest xprv' pass'
-    pure $ if isMatch then Just pass' else Nothing
-  pure (restore, fmapMaybe id isValid)
 
 -- | Check the validity of the password by signing and verifying a message
 passwordRoundTripTest :: MonadJSM m => PrivateKey -> Password -> m Bool

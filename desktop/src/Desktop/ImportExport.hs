@@ -128,7 +128,7 @@ doImport txLogger pw contents = runExceptT $ do
   feVer <- extractImportVersionField storeFrontendVersionKey 0 jVal
   feData <- extractImportDataField @Value storeFrontendDataKey feVer jVal
 
-  _ <- ExceptT $ runBIPCryptoT (constant (rootKey, unPassword pw)) $ do
+  _ <- ExceptT $ runBIPCryptoT (constant (rootKey, pw)) $ do
     let vStore = FrontendStore.versionedStorage
     feLatestEither <- first (expandDecodeVersionJsonError storeFrontendDataKey feVer)
       <$> (_versionedStorage_decodeVersionedJson vStore feVer feData)
