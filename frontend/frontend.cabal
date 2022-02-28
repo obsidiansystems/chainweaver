@@ -63,6 +63,7 @@ library
     , megaparsec
     , modern-uri
     , monoidal-containers
+    , mmorph
     , mtl
     , newtype-generics
     , obelisk-executable-config-lookup
