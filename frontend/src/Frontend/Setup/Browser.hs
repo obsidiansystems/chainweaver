@@ -154,7 +154,7 @@ bipWalletBrowser fileFFI walletConnect mkAppCfg = do
           (updates, trigger) <- newTriggerEvent
           let frontendFileFFI = liftFileFFI (lift . lift) fileFFI
           App.app sidebarLogoutLink frontendFileFFI $ mkAppCfg $
-            appSettingsBrowser txLogger frontendFileFFI trigger details updates changePasswordBrowserAction
+            appSettingsBrowser txLogger frontendFileFFI trigger details updates changePasswordBrowserAction walletConnect
 
           setRoute $ landingPageRoute <$ onLogoutConfirm
           pure $ leftmost
@@ -176,8 +176,9 @@ appSettingsBrowser ::
   -> Dynamic t (Identity (PrivateKey, Password))
   -> Event t (PrivateKey, Password) 
   -> (Int -> PrivateKey -> Password -> (Performable m) (Key PrivateKey))
+  -> WalletConnect t
   -> EnabledSettings PrivateKey t m
-appSettingsBrowser txLogger frontendFileFFI newPwdTrigger details keyUpdates changePasswordBrowserAction = EnabledSettings
+appSettingsBrowser txLogger frontendFileFFI newPwdTrigger details keyUpdates changePasswordBrowserAction wc = EnabledSettings
   { _enabledSettings_changePassword = Just $ ChangePassword
     { _changePassword_requestChange = performEvent . attachWith doChange (current details)
     -- When updating the keys here, we just always regenerate the key from
@@ -185,6 +186,7 @@ appSettingsBrowser txLogger frontendFileFFI newPwdTrigger details keyUpdates cha
     , _changePassword_updateKeys = (keyUpdates, changePasswordBrowserAction)
     }
   , _enabledSettings_exportWallet = Just $ mkExportWallet txLogger frontendFileFFI details (Proxy :: Proxy (BIPStorage PrivateKey))
+  , _enabledSettings_walletConnect = Just wc
   , _enabledSettings_transactionLog = False
   }
   where

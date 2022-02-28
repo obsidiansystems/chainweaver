@@ -179,6 +179,7 @@ library
                  , Frontend.UI.Dialogs.AddVanityAccount.DefineKeyset
                  , Frontend.UI.Dialogs.AddVanityAccount
                  , Frontend.UI.Dialogs.TxLogs
+                 , Frontend.UI.Dialogs.WalletConnect
                  , Frontend.UI.Dialogs.WatchRequest
                  , Frontend.UI.ErrorList
                  , Frontend.UI.Form.Common
