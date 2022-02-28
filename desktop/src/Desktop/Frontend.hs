@@ -164,7 +164,7 @@ bipWallet fileFFI signingReq quickSignReq mkAppCfg = do
       -> RoutedT t (R FrontendRoute) m (Event t (DSum LockScreen Identity))
     runSetup0 mPrv walletExists = do
       let pwCheck k p= pure $ passwordRoundTripTest k p
-          runF k (Password p) = runBIPCryptoT (pure (k, p))
+          runF k p = runBIPCryptoT (pure (k, p))
           importWidgetApis = ImportWidgetApis BIPStorage_RootKey pwCheck runF
 
       keyAndPass <- runSetup (liftFileFFI lift fileFFI) (isJust mPrv) walletExists importWidgetApis
@@ -238,8 +238,7 @@ bipWallet fileFFI signingReq quickSignReq mkAppCfg = do
               , _changePassword_updateKeys = (updates, changePasswordDesktopAction)
               }
             , _enabledSettings_exportWallet =
-              let details' = fmap (\(k, p) -> (k, Password p)) <$> details
-              in Just $ mkExportWallet txLogger frontendFileFFI details (Proxy :: Proxy (BIPStorage Crypto.XPrv))
+              Just $ mkExportWallet txLogger frontendFileFFI details (Proxy :: Proxy (BIPStorage Crypto.XPrv))
             , _enabledSettings_transactionLog = True
             }
 
