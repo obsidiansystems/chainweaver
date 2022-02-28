@@ -9,6 +9,7 @@ module Frontend.WalletConnect where
 import Control.Monad (join, void, forM_)
 import Control.Monad.IO.Class
 import Control.Monad.Fix
+import Control.Lens
 import qualified Data.Aeson as A
 import Data.Maybe (listToMaybe, fromMaybe)
 import qualified Data.Map as M
@@ -21,13 +22,14 @@ import Obelisk.Frontend
 import Obelisk.Route.Frontend
 import Obelisk.Generated.Static
 import System.IO
-import Language.Javascript.JSaddle (valToJSON, liftJSM, JSM)
+import Language.Javascript.JSaddle (valToJSON, liftJSM, JSM, fun, jsg, js0)
 
 import Kadena.SigningApi
 
 import WalletConnect.Wallet
 import Frontend.AppCfg
 import Frontend.Wallet (accountKeys, unAccountData)
+import Reflex.Notifications
 import Common.Wallet
 
 setupWalletConnect :: (_)
@@ -65,6 +67,31 @@ setupWalletConnect = do
 
   signingHandler <- mkBufferedFRPHandler signingEv
   quickSignHandler <- mkBufferedFRPHandler quickSignEv
+
+  askPermissionEv <- delay 0 =<< getPostBuild
+  let
+    sendNotificationEv = title <$ leftmost [() <$ signingEv, () <$ quickSignEv]
+    title = "You have an incoming signing request."
+    notification :: Notification Int
+    notification = Notification
+      { onclick = Just $ fun $ \_ _ _ -> do -- TODO: confirm if this works
+          w <- jsg ("window" :: Text)
+          void $ w ^. js0 ("focus" :: Text)
+      , onclose = Nothing
+      , onerror = Nothing
+      , onshow = Nothing
+      , options = defaultNotificationOptions
+        { body = "Open your wallet to view and sign the transaction."
+        }
+      , contents = title
+      }
+  txtEv <- withUserPermission askPermissionEv
+    (do
+      sendNotification $ notification <$ sendNotificationEv
+      pure "Notification permission was granted by the user"
+      )
+    (pure . (\e -> "Error in obtaining notification permission: " <> show e))
+  -- TODO log txtEv
 
   pure (walletConnect, signingHandler, quickSignHandler)
 
