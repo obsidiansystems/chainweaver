@@ -43,6 +43,7 @@ import Reflex.Dom.ACE.Extended hiding (Annotation (..))
 import Reflex.Dom.Core
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import WalletConnect.Wallet (doNewPairing)
 
 import Common.OAuth (OAuthProvider (OAuthProvider_GitHub))
 import Common.Route
@@ -168,7 +169,15 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
             mUri <- askRoute >>= sample . current . fmap (\case
               (FrontendRoute_WalletConnect :/ q) -> join $ Map.lookup "uri" q
               _ -> Nothing)
-            walletConnectTopWidget wc mUri
+            case mUri of
+              Nothing -> text "Error in pairing, please try opening the pairing link again."
+              Just uri -> do
+                pairEv <- getPostBuild
+                resultEv <- doNewPairing wc (uri <$ pairEv)
+                widgetHold_ blank $ ffor pairEv $ \_ -> do
+                  widgetHold_ (text "Waiting for pairing to complete") $ ffor resultEv $ \case
+                    True -> setRoute . ((FrontendRoute_Accounts :/ mempty) <$) =<< getPostBuild
+                    False -> text "Pairing Failed"
         pure controlCfg
 
     accountDatalist ideL

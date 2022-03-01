@@ -196,7 +196,7 @@ bipWallet fileFFI signingReq quickSignReq mkAppCfg = do
         sreq <- tryReadMVarTriggerEvent signingReq
         qsreq <- tryReadMVarTriggerEvent  quickSignReq
         let signingReqEv = leftmost [() <$ sreq, () <$ qsreq]
-        (restore, mLogin) <- lockScreenWidget signingReqEv (\k p -> pure $ passwordRoundTripTest k p) $ fmap runIdentity $ current root
+        (restore, mLogin) <- lockScreenWidget signingReqEv (\k p -> pure $ passwordRoundTripTest k p) False $ fmap runIdentity $ current root
         pure $ leftmost
           [ (LockScreen_Restore ==>) . runIdentity <$> current root <@ restore
           , (LockScreen_Unlocked ==>) <$> attach (runIdentity <$> current root) mLogin

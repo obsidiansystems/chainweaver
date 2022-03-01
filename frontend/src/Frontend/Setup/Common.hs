@@ -13,7 +13,7 @@ module Frontend.Setup.Common where
 
 import Control.Lens ((??), (?~), (<>~))
 import Control.Error (hush)
-import Control.Monad (guard, unless, void)
+import Control.Monad (guard, unless, void, when)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
@@ -133,10 +133,15 @@ lockScreenWidget
   )
   => Event t ()
   -> (key -> Password -> (Performable m) Bool)
+  -> Bool
   -> Behavior t key
   -> m (Event t (), Event t Password)
-lockScreenWidget signingReqEv pwCheck xprv = setupDiv "fullscreen" $ divClass "wrapper" $ setupDiv "splash" $ mdo
+lockScreenWidget signingReqEv pwCheck isWalletConnect xprv = setupDiv "fullscreen" $ divClass "wrapper" $ setupDiv "splash" $ mdo
   (restore, pass, eSubmit) <- lockScreen isValid
+  when isWalletConnect $ do
+    let line = divClass (setupClass "signing-request") . text
+    line "You are about to do a Wallet Connect pairing."
+    line "Please login to finish doing the pairing, or close this tab if don't intend to proceed with the pairing."
   widgetHold_ blank $ ffor signingReqEv $ \_ -> do
     let line = divClass (setupClass "signing-request") . text
     line "You have an incoming signing request."
