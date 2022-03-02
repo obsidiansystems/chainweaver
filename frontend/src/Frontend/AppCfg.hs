@@ -77,7 +77,6 @@ data AppCfg key t m = AppCfg
   , _appCfg_enabledSettings :: EnabledSettings key t m
   , _appCfg_logMessage :: LogLevel -> LogStr -> IO ()
   -- ^ Logging Function
-  , _appCfg_walletConnect :: Maybe (WalletConnect t)
   }
 
 data MVarHandler req res = MVarHandler

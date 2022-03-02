@@ -99,7 +99,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
   ideL <- makeIde fileFFI appCfg cfg
   signingReq <- _appCfg_signingHandler appCfg
   quickSignReq <- _appCfg_quickSignHandler appCfg
-  let mWalletConnect = _appCfg_walletConnect appCfg
+  let mWalletConnect = _enabledSettings_walletConnect (_appCfg_enabledSettings appCfg)
   mapM_ (handleWalletConnectPairings $ ideL ^. wallet_accounts) mWalletConnect
   sigPopup <- walletSidebar sidebarExtra
   updates <- divClass "page" $ do
@@ -163,7 +163,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
         pure $ controlCfg <> mainCfg
       FrontendRoute_WalletConnect -> do
         controlCfg <- underNetworkBar "WalletConnect" (mempty <$ blank)
-        case _appCfg_walletConnect appCfg of
+        case mWalletConnect of
           Nothing -> text "Wallet Connect is not available"
           Just wc -> do
             mUri <- askRoute >>= sample . current . fmap (\case

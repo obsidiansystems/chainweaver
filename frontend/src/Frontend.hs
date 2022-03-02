@@ -103,7 +103,6 @@ frontend = Frontend
         , _appCfg_signingHandler = mapRoutedT lift signingHandler
         , _appCfg_enabledSettings = enabledSettings
         , _appCfg_logMessage = errorLevelLogger
-        , _appCfg_walletConnect = Just walletConnect
         }
   }
 
