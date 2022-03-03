@@ -6,7 +6,7 @@
 
 module Frontend.WalletConnect where
 
-import Control.Monad (join, void, forM_)
+import Control.Monad (join, void, forM_, guard)
 import Control.Monad.IO.Class
 import Control.Monad.Fix
 import Control.Lens
@@ -29,6 +29,7 @@ import Kadena.SigningApi
 import WalletConnect.Wallet
 import Frontend.AppCfg
 import Frontend.Wallet (accountKeys, unAccountData)
+import Frontend.UI.Dialogs.WalletConnect
 import Reflex.Notifications
 import Common.Wallet
 
@@ -95,23 +96,29 @@ setupWalletConnect = do
 
   pure (walletConnect, signingHandler, quickSignHandler)
 
-handleWalletConnectPairings accounts walletConnect = do
-  let ev = attach (current accounts) (_walletConnect_proposals walletConnect)
+handleWalletConnectPairings pubKeys network walletConnect = do
+  let
+    withNetwork = attach (current network) (_walletConnect_proposals walletConnect)
+  let approvedMethods = ["kadena_sign", "kadena_quicksign"]
 
-  performEvent_ $ ffor ev $ \(d, Proposal t m p approve) -> do
+  -- Reject the session without user input if the permissions are not correct
+  proposalEv <- performEvent $ ffor withNetwork $ \(n, p) -> do
     let
+      wrongMethods = filter (not . (flip elem $ approvedMethods)) methods
+      wrongChains = filter (/= walletConnectChainId n) chains
+      Permissions chains methods = _proposal_permissions p
+    if null wrongMethods && null wrongChains
+      then pure $ Right (n, p)
+      else do
+        liftJSM $ (_proposal_approval p) (Left ())
+        pure $ Left (wrongMethods, wrongChains, n, p)
 
-      -- accSet = Set.unions $ map accountKeys (foldMap M.elems $ map _accountInfo_chains $ foldMap M.elems $ M.elems $ unAccountData d)
-      accSet = Set.fromList $ map (\n -> fromMaybe n (T.stripPrefix "k:" n)) $
-        map unAccountName $ foldMap M.keys $ M.elems $ unAccountData d
-      -- accSet = Set.fromList $ map toName (foldMap M.assocs $ map _accountInfo_chains $ foldMap M.elems $ M.elems $ unAccountData d)
-      -- toName (chainId, account) = T.pack (show chainId) <> ":" <> keyToText account
-    liftIO $ putStrLn $ "Auto Approving : " <> T.unpack t
-    -- The react-app require an account for the chain it currently supports, hence eip115:42
-    let accounts = map ("kadena:0:" <>) $ Set.toList accSet
-    liftIO $ putStrLn $ show $ accounts
+  let
+    (proposalErrorEv, checkedProposalEv) = fanEither proposalEv
+    modalEv1 = uiWalletConnectSessionProposal <$> attach (current pubKeys) checkedProposalEv
+    modalEv2 = uiWalletConnectSessionPermissionError <$> proposalErrorEv
 
-    liftJSM $ approve $ Right accounts
+  pure $ leftmost [modalEv1, modalEv2]
 
 walletConnectTopWidget wc@(WalletConnect pairings sessions _ _ _) mUri = do
 

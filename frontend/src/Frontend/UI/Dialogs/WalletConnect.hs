@@ -6,30 +6,20 @@
 
 module Frontend.UI.Dialogs.WalletConnect where
 
-import Control.Monad (join, void, forM_)
--- import Control.Monad.IO.Class
--- import Control.Monad.Fix
--- import Control.Lens
--- import qualified Data.Aeson as A
--- import Data.Maybe (listToMaybe, fromMaybe)
--- import qualified Data.Map as M
--- import qualified Data.Set as Set
--- import Data.Text (Text)
--- import qualified Data.Text as T
+import Control.Monad (join, void, forM_, forM, unless)
+import Data.Maybe (catMaybes)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Reflex.Dom hiding (Request)
--- import Pact.Server.ApiClient (runTransactionLoggerT, noLogger)
--- import Obelisk.Frontend
--- import Obelisk.Route.Frontend
--- import Obelisk.Generated.Static
--- import System.IO
 import Language.Javascript.JSaddle (valToJSON, liftJSM, JSM, fun, jsg, js0)
 
 
-import WalletConnect.Wallet
+import WalletConnect.Wallet hiding (PublicKey)
 import Frontend.AppCfg
 import           Frontend.UI.Modal
 import           Frontend.UI.Widgets
 import           Frontend.UI.Widgets.Helpers (dialogSectionHeading)
+import Common.Network
 import Common.Wallet
 
 uiWalletConnect
@@ -42,22 +32,102 @@ uiWalletConnect
 uiWalletConnect wc@(WalletConnect pairings sessions _ _ _) _ = do
   onClose <- modalHeader $ text "Wallet Connect"
 
-  modalMain $ mdo
-    selectEv <- uiSegment mempty $ do
-      uiGroupHeader mempty $
-        dialogSectionHeading mempty "Active Sessions"
+  modalMain $ uiSegment mempty $ do
+    uiGroupHeader mempty $
+      dialogSectionHeading mempty "Active Sessions"
 
-      dyn $ ffor sessions $ \ss -> do
-        forM_ ss $ \session -> uiGroup "segment" $ do
-          let m = snd $ _session_peer session
-          showMetaData m
-          ev <- uiButton btnCfgTertiary $ text "Disconnect"
-          performEvent $ ffor ev $ \_ -> liftJSM $ _session_disconnect session
+    dyn $ ffor sessions $ \ss -> do
+      forM_ ss $ \session -> uiGroup "segment" $ do
+        let m = snd $ _session_peer session
+        showMetaData m
+        ev <- uiButton btnCfgTertiary $ text "Disconnect"
+        performEvent $ ffor ev $ \_ -> liftJSM $ _session_disconnect session
     pure ()
 
   pure (mempty, onClose)
   where
-    showMetaData m = do
-      uiGroupHeader mempty $ text $ _metadata_name m
-      el "p" $ text $ _metadata_url m
-      el "p" $ text $ _metadata_description m
+
+uiWalletConnectSessionProposal
+  :: ( MonadWidget t m
+     , Monoid mConf
+     )
+  => ([PublicKey], (NetworkName, Proposal))
+  -> Event t ()
+  -> m (mConf, Event t ())
+uiWalletConnectSessionProposal (keys, (networkName, Proposal _ (_, meta) _ respond)) _ = do
+  onClose <- modalHeader $ text "Wallet Connect Session"
+
+  doneEv <- modalMain $ uiSegment mempty $ do
+    uiGroupHeader mempty $
+      dialogSectionHeading mempty "Please select keys for this session"
+
+    dSelAccs <- uiGroup "segment" $ do
+      sel <- forM keys $ \k -> do
+        cb <- uiCheckbox mempty False def (text $ keyToText k)
+        pure $ ffor (value cb) $ \case
+          True -> Just (keyToText k)
+          _ -> Nothing
+      pure $ catMaybes <$> sequence sel
+
+
+    -- Dapp info
+    uiGroup "segment" $ do
+      dialogSectionHeading mempty "dApp metadata"
+      showMetaData meta
+      let
+        cfg = btnCfgPrimary
+          & uiButtonCfg_disabled .~ fmap null dSelAccs
+      approve <- uiButtonDyn cfg $ text "Approve"
+      reject <- uiButton btnCfgTertiary $ text "Reject"
+      let
+        toAccount a = walletConnectChainId networkName <> ":" <> a
+        approveEv = fforMaybe (tag (current dSelAccs) approve) $ \case
+          [] -> Nothing
+          vs -> Just $ Right $ map toAccount vs
+        rEv = leftmost [ Left () <$ reject, approveEv ]
+
+      performEvent $ ffor rEv $ \v -> liftJSM $ respond v
+
+  pure (mempty, leftmost [onClose, doneEv])
+
+uiWalletConnectSessionPermissionError
+  :: ( MonadWidget t m
+     , Monoid mConf
+     )
+  => ([Method], [Chain], NetworkName, Proposal)
+  -> Event t ()
+  -> m (mConf, Event t ())
+uiWalletConnectSessionPermissionError (methods, chains, networkName, Proposal _ (_, meta) _ respond) _ = do
+  onClose <- modalHeader $ text "Wallet Connect Session"
+
+  doneEv <- modalMain $ uiSegment mempty $ do
+    uiGroupHeader mempty $
+      dialogSectionHeading mempty "There is an error in the incoming session proposal request"
+
+    uiGroup "segment" $ do
+      dialogSectionHeading mempty "dApp metadata"
+      showMetaData meta
+
+    unless (null methods) $ uiGroup "segment" $ do
+      text $ "These methods are not supported : " <>
+        (T.intercalate ", " methods)
+
+    unless (null chains) $ uiGroup "segment" $ do
+      text $ "These chains are not supported : " <>
+        (T.intercalate ", " chains)
+
+    uiButton btnCfgTertiary $ text "Close"
+  pure (mempty, leftmost [onClose, doneEv])
+
+showMetaData m = do
+  uiGroupHeader mempty $ text $ _metadata_name m
+  el "p" $ text $ _metadata_url m
+  el "p" $ text $ _metadata_description m
+
+walletConnectChainId :: NetworkName -> Text
+walletConnectChainId network
+  | n == "mainnet" = "kadena:mainnet01"
+  | n == "testnet" = "kadena:testnet04"
+  | otherwise = "kadena:testnet04" -- TODO: FIXME: only for testing
+  where n = textNetworkName network
+

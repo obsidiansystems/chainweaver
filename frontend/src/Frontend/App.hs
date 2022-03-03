@@ -23,6 +23,7 @@ import Control.Monad.Reader (ask)
 import Control.Monad.State.Strict
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default (Default (..))
+import qualified Data.IntMap                        as IntMap
 import Data.Some (Some(..))
 import Data.Text (Text)
 import GHCJS.DOM.EventM (on)
@@ -100,7 +101,6 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
   signingReq <- _appCfg_signingHandler appCfg
   quickSignReq <- _appCfg_quickSignHandler appCfg
   let mWalletConnect = _enabledSettings_walletConnect (_appCfg_enabledSettings appCfg)
-  mapM_ (handleWalletConnectPairings $ ideL ^. wallet_accounts) mWalletConnect
   sigPopup <- walletSidebar sidebarExtra
   updates <- divClass "page" $ do
     let mkPageContent c = divClass (c <> " page__content visible")
@@ -209,6 +209,10 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
   qreq <- elAttr "div" ("style" =: "position: absolute; border: 1px solid black; left: 200px; top: 20px;") $
     uiButton (headerBtnCfgPrimary & uiButtonCfg_class <>~ " main-header__account-button") $
       text "QuickSign"
+
+  let pubKeys = fmap (_keyPair_publicKey . _key_pair) . IntMap.elems <$> ideL ^. wallet_keys
+  wcModals <- mapM (handleWalletConnectPairings pubKeys (ideL ^. network_selectedNetwork)) mWalletConnect
+
   let
     onGistCreatedModal = Just . uiCreatedGist <$> ideL ^. gistStore_created
     gistModalCfg = mempty & modalCfg_setModal .~ onGistCreatedModal
@@ -216,6 +220,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
     onQuickSignModal = Just . uiQuickSign ideL <$> quickSignReq
     signingModalCfg = mempty & modalCfg_setModal .~ onSigningModal
     quickSignModalCfg = mempty & modalCfg_setModal .~ onQuickSignModal
+    wcModalCfg = maybe mempty (\v -> mempty & modalCfg_setModal .~ (Just <$> v)) wcModals
 
   pure $ mconcat
     [ updates
@@ -223,6 +228,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
     , gistModalCfg
     , signingModalCfg
     , quickSignModalCfg
+    , wcModalCfg
     , mempty & ideCfg_editor . editorCfg_loadCode .~ (snd <$> _fileFFI_externalFileOpened fileFFI)
     ]
 
