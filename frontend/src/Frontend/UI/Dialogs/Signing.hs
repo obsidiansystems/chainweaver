@@ -63,6 +63,7 @@ import           Frontend.Foundation            hiding (Arg)
 import           Frontend.JsonData
 import           Frontend.Network
 import           Frontend.UI.DeploymentSettings
+import           Frontend.UI.Dialogs.WalletConnect (showMetaData)
 import           Frontend.UI.Modal.Impl
 import           Frontend.UI.TabBar
 import           Frontend.UI.Widgets
@@ -94,7 +95,27 @@ uiSigning
   -> ((SigningRequest, Maybe Metadata), Either Text SigningResponse -> JSM ())
   -> Event t ()
   -> m (mConf, Event t ())
-uiSigning ideL ((signingRequest,_), writeSigningResponse) onCloseExternal = do
+uiSigning ideL ((signingRequest, mMeta), writeSigningResponse) onCloseExternal = do
+  (dMConf, dEv) <- (splitDynPure <$>) $ workflow $ maybe signModal (showMetadataWorkflow signModal sendResp) mMeta
+  mConf <- networkViewFlatten (pure <$> dMConf)
+  pure (mConf, switchPromptlyDyn dEv)
+  where
+    signModal = uiSigningWorkflow ideL signingRequest sendResp onCloseExternal
+    sendResp = performEvent . fmap (liftJSM . writeSigningResponse)
+
+uiSigningWorkflow
+  :: forall key t m mConf
+  . ( MonadWidget t m
+    , HasUISigningModelCfg mConf key t
+    , HasCrypto key (Performable m)
+    , HasTransactionLogger m
+    )
+  => ModalIde m key t
+  -> SigningRequest
+  -> (Event t (Either Text SigningResponse) -> m (Event t ()))
+  -> Event t ()
+  -> Workflow t m (mConf, Event t ())
+uiSigningWorkflow ideL signingRequest writeSigningResponse onCloseExternal = Workflow $ do
   onClose <- modalHeader $ text "Signing Request"
 
   (mConf, result, _) <- uiDeploymentSettings ideL $ DeploymentSettingsConfig
@@ -117,14 +138,14 @@ uiSigning ideL ((signingRequest,_), writeSigningResponse) onCloseExternal = do
 
   let response = deploymentResToResponse <$> result
 
-  finished <- (performEvent . fmap (liftJSM . writeSigningResponse)) <=< headE $
+  finished <- writeSigningResponse <=< headE $
     maybe (Left "Cancelled") Right <$> leftmost
       [ Just <$> response
       , Nothing <$ onCloseExternal
       , Nothing <$ onClose
       ]
 
-  pure (mConf, finished)
+  pure ((mConf, finished), never)
 
   where
     deploymentResToResponse result =
@@ -154,14 +175,14 @@ uiQuickSign
   -> ((QuickSignRequest, Maybe Metadata), Either Text QuickSignResponse -> JSM ())
   -> Event t ()
   -> m (mConf, Event t ())
-uiQuickSign ideL ((qsr,_), writeSigningResponse) _onCloseExternal = (mempty, ) <$> do
+uiQuickSign ideL ((qsr,mMeta), writeSigningResponse) _onCloseExternal = (mempty, ) <$> do
   let toPayReqOrErr txt = ffor (eitherDecodeStrict $ encodeUtf8 txt) $ \p ->
         flip PayloadSigningRequest p $ payloadToSigData p txt
   if _quickSignRequest_commands qsr == []
      then sendResp =<< failWith "QuickSign request was empty" ""
      else case partitionEithers $ fmap toPayReqOrErr $ _quickSignRequest_commands qsr of
        ([], payloads) ->
-         quickSignModal ideL sendResp payloads
+         quickSignModal mMeta ideL sendResp payloads
        (es, _) -> sendResp =<<
          failWith ("QuickSign request contained invalid commands:\n" <> T.unlines (map T.pack es)) ""
   where
@@ -178,17 +199,24 @@ failWith msgHeader msg = do
     const $ Left msgHeader
 
 quickSignModal
-  :: forall key t m mConf model
+  :: forall key t m model
   . ( MonadWidget t m
     , HasCrypto key (Performable m)
     , HasWallet model key t
     , HasNetwork model t
     )
-  => model
+  => Maybe Metadata
+  -> model
   -> (Event t (Either Text QuickSignResponse) -> m (Event t ()))
   -> [PayloadSigningRequest]
   -> m (Event t ())
-quickSignModal ideL writeSigningResponse payloadRequests = fmap switchPromptlyDyn $ workflow $ Workflow $ do
+quickSignModal mMeta ideL writeSigningResponse payloadRequests =
+  fmap switchPromptlyDyn $ workflow $ maybe qsWorkflow
+    (mapWorkflow snd . (showMetadataWorkflow (mapWorkflow ((),) qsWorkflow) writeSigningResponse)) mMeta
+  where
+    qsWorkflow = quickSignWorkflow ideL writeSigningResponse payloadRequests
+
+quickSignWorkflow ideL writeSigningResponse payloadRequests = Workflow $ do
   keysAndNet <- sample $ fetchKeysAndNet ideL
   runQuickSignChecks payloadRequests (_srws_currentNetwork keysAndNet) $ do
     onClose <- modalHeader $ text "QuickSign Request"
@@ -250,6 +278,23 @@ handleSigning payloadRequests writeSigningResponse keysAndNet = Workflow $ do
     forM toSign $ \sd -> addSigsToSigData sd (_srws_cwKeys keysAndNet) []
   res <- writeSigningResponse $ Right <$> quickSignRes
   pure (res, never)
+
+showMetadataWorkflow
+  :: (MonadWidget t m, HasCrypto key (Performable m), Monoid mConf)
+  => Workflow t m (mConf, Event t ())
+  -> (Event t (Either Text a) -> m (Event t ()))
+  -> Metadata
+  -> Workflow t m (mConf, Event t ())
+showMetadataWorkflow next writeSigningResponse m = Workflow $ do
+  onClose <- modalHeader $ text "Incoming signing request from"
+  modalMain $ do
+    showMetaData m
+  (reject, proceed) <- modalFooter $ do
+    reject <- confirmButton def "Reject"
+    proceed <- confirmButton def "Proceed"
+    pure (reject, proceed)
+  closeEv <- writeSigningResponse (Left "Rejected" <$ leftmost [reject, onClose])
+  pure ((mempty, closeEv), next <$ proceed)
 
 -- |Summary view for quicksign ui
 summarizeTransactions
