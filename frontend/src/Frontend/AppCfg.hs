@@ -72,8 +72,8 @@ data AppCfg key t m = AppCfg
   -- ^ Initial code to load into editor
   , _appCfg_editorReadOnly :: Bool
   -- ^ Is the editor read only?
-  , _appCfg_signingHandler :: m (FRPHandler SigningRequest SigningResponse t)
-  , _appCfg_quickSignHandler :: m (FRPHandler QuickSignRequest QuickSignResponse t)
+  , _appCfg_signingHandler :: m (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
+  , _appCfg_quickSignHandler :: m (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
   , _appCfg_enabledSettings :: EnabledSettings key t m
   , _appCfg_logMessage :: LogLevel -> LogStr -> IO ()
   -- ^ Logging Function

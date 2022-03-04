@@ -35,20 +35,22 @@ import Common.Wallet
 
 setupWalletConnect :: (_)
   => m (WalletConnect t
-     , m (FRPHandler SigningRequest SigningResponse t)
-     , m (FRPHandler QuickSignRequest QuickSignResponse t)
+     , m (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
+     , m (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
      )
 setupWalletConnect = do
   walletConnect <- initWalletConnect Nothing "Kadena"
   let
-    ev = ffor (_walletConnect_requests walletConnect) $ \(t, req, reply) ->
+    ev0 = attach (current $ _walletConnect_sessions walletConnect) (_walletConnect_requests walletConnect)
+    ev = ffor ev0 $ \(sessions, (t, req, reply)) ->
       let
+        mMeta = snd . _session_peer <$> M.lookup t sessions
         resp :: (A.ToJSON b) => Either a b -> JSM ()
         resp = either (const $ reply $ Left ()) (reply . Right . A.toJSON)
       in case A.fromJSON (_request_params req) of
-        A.Success r -> Right (Left (r, resp))
+        A.Success r -> Right (Left ((r, mMeta), resp))
         A.Error e1 -> case A.fromJSON (_request_params req) of
-          A.Success r -> Right (Right (r, resp))
+          A.Success r -> Right (Right ((r, mMeta), resp))
           A.Error e2 -> Left (e1, e2)
     sucEv = fmapMaybe (either (const Nothing) Just) ev
     errEv = fmapMaybe (either Just (const Nothing)) ev
@@ -61,7 +63,7 @@ setupWalletConnect = do
 
   performEvent $ ffor quickSignEv $ \(r, _) -> liftIO $ do
     putStrLn $ "Recieved quicksign request"
-    putStrLn $ show $ _quickSignRequest_commands r
+    putStrLn $ show $ _quickSignRequest_commands $ fst r
   performEvent $ ffor errEv $ \(e1, e2) -> liftIO $ do
     putStrLn $ "Error in request decoding: e1: " <> e1
     putStrLn $ "Error in request decoding: e2: " <> e2

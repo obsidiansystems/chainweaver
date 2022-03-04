@@ -150,11 +150,10 @@ bipWallet
      , Prerender js t m
      )
   => FileFFI t m
-  -> MVar SigningRequest
-  -> MVar QuickSignRequest
+  -> Event t ()
   -> MkAppCfg t m
   -> RoutedT t (R FrontendRoute) m ()
-bipWallet fileFFI signingReq quickSignReq mkAppCfg = do
+bipWallet fileFFI signingReqEv mkAppCfg = do
   txLogger <- askTransactionLogger
 
   let
@@ -193,9 +192,6 @@ bipWallet fileFFI signingReq quickSignReq mkAppCfg = do
       LockScreen_RunSetup :=> _ -> runSetup0 Nothing WalletExists_No
       -- Wallet exists but the lock screen is active
       LockScreen_Locked :=> Compose root -> do
-        sreq <- tryReadMVarTriggerEvent signingReq
-        qsreq <- tryReadMVarTriggerEvent  quickSignReq
-        let signingReqEv = leftmost [() <$ sreq, () <$ qsreq]
         (restore, mLogin) <- lockScreenWidget signingReqEv (\k p -> pure $ passwordRoundTripTest k p) False $ fmap runIdentity $ current root
         pure $ leftmost
           [ (LockScreen_Restore ==>) . runIdentity <$> current root <@ restore

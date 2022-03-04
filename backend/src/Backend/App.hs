@@ -21,6 +21,7 @@ import qualified Control.Concurrent.Async as Async
 import qualified Data.ByteString as BS
 import qualified Data.List as L
 import qualified Data.Map as M
+import Data.Proxy (Proxy(..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -31,6 +32,7 @@ import qualified Snap.Http.Server as Snap
 import qualified System.Directory as Directory
 import qualified System.Environment as Env
 import Pact.Server.ApiClient (runTransactionLoggerT, logTransactionFile, commandLogFilename)
+import WalletConnect.Wallet (Metadata)
 
 import Backend (serveBackendRoute)
 import Common.Logger (LogStr,LogLevel)
@@ -164,6 +166,8 @@ main' ffi mainBundleResourcePath runHTML = do
     (signingHandler, quickSignHandler) <- walletServer
       (_appFFI_moveToForeground ffi)
       (_appFFI_moveToBackground ffi)
+      (Proxy :: Proxy Metadata)
+
     waitForBackend port
     liftIO $ putStrLn "Starting jsaddle"
     runHTML "index.html" route putStrLn handleOpen $ do
@@ -192,6 +196,11 @@ main' ffi mainBundleResourcePath runHTML = do
             bowserLoad <- takeMVarTriggerEvent bowserMVar
             fileOpened <- takeMVarTriggerEvent fileOpenedMVar
 
+            signingReqEv <- do
+              sreq <- tryReadMVarTriggerEvent (_mvarHandler_readRequest signingHandler)
+              qsreq <- tryReadMVarTriggerEvent (_mvarHandler_readRequest quickSignHandler)
+              pure $ leftmost [() <$ sreq, () <$ qsreq]
+
             let fileFFI = FileFFI
                   { _fileFFI_openFileDialog = liftIO . _appFFI_global_openFileDialog ffi
                   , _fileFFI_externalFileOpened = fileOpened
@@ -213,7 +222,7 @@ main' ffi mainBundleResourcePath runHTML = do
                  $ runWithReplace loaderMarkup
                  $ ( liftIO (_appFFI_activateWindow ffi)
                      >> liftIO (_appFFI_resizeWindow ffi defaultWindowSize)
-                     >> bipWallet fileFFI (_mvarHandler_readRequest signingHandler) (_mvarHandler_readRequest quickSignHandler) appCfg
+                     >> bipWallet fileFFI signingReqEv appCfg
                    )
                  <$ bowserLoad
             pure ()

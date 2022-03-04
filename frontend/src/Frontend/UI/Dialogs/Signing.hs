@@ -55,6 +55,7 @@ import           Data.Default
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import qualified Data.Text.Encoding             as T (encodeUtf8)
+import WalletConnect.Wallet
 
 import           Frontend.Crypto.Class
 import           Frontend.Crypto.Ed25519        (fromPactPublicKey)
@@ -90,10 +91,10 @@ uiSigning
     , HasTransactionLogger m
     )
   => ModalIde m key t
-  -> (SigningRequest, Either Text SigningResponse -> JSM ())
+  -> ((SigningRequest, Maybe Metadata), Either Text SigningResponse -> JSM ())
   -> Event t ()
   -> m (mConf, Event t ())
-uiSigning ideL (signingRequest, writeSigningResponse) onCloseExternal = do
+uiSigning ideL ((signingRequest,_), writeSigningResponse) onCloseExternal = do
   onClose <- modalHeader $ text "Signing Request"
 
   (mConf, result, _) <- uiDeploymentSettings ideL $ DeploymentSettingsConfig
@@ -150,10 +151,10 @@ uiQuickSign
     , HasLogger model t
     )
   => model -- ModalIde m key t
-  -> (QuickSignRequest, Either Text QuickSignResponse -> JSM ())
+  -> ((QuickSignRequest, Maybe Metadata), Either Text QuickSignResponse -> JSM ())
   -> Event t ()
   -> m (mConf, Event t ())
-uiQuickSign ideL (qsr, writeSigningResponse) _onCloseExternal = (mempty, ) <$> do
+uiQuickSign ideL ((qsr,_), writeSigningResponse) _onCloseExternal = (mempty, ) <$> do
   let toPayReqOrErr txt = ffor (eitherDecodeStrict $ encodeUtf8 txt) $ \p ->
         flip PayloadSigningRequest p $ payloadToSigData p txt
   if _quickSignRequest_commands qsr == []
