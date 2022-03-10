@@ -12,6 +12,11 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Reflex.Dom hiding (Request)
 import Language.Javascript.JSaddle (valToJSON, liftJSM, JSM, fun, jsg, js0)
+import Data.ByteString.Lazy (toStrict, fromStrict)
+import qualified Data.ByteString.Lazy as LB (ByteString)
+import Data.Aeson (encode, decode)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
 
 import WalletConnect.Wallet hiding (PublicKey)
@@ -116,6 +121,34 @@ uiWalletConnectSessionPermissionError (methods, chains, networkName, Proposal _ 
       text $ "These chains are not supported : " <>
         (T.intercalate ", " chains)
 
+    uiButton btnCfgTertiary $ text "Close"
+  pure (mempty, leftmost [onClose, doneEv])
+
+uiWalletConnectSigReqError
+  :: ( MonadWidget t m
+     , Monoid mConf
+     )
+  => (Maybe Metadata, String, Request)
+  -> Event t ()
+  -> m (mConf, Event t ())
+uiWalletConnectSigReqError (mMeta, err, Request _ method params) _ = do
+  onClose <- modalHeader $ text "Wallet Connect Session"
+
+  doneEv <- modalMain $ uiSegment mempty $ do
+    uiGroupHeader mempty $
+      dialogSectionHeading mempty "There was an error in the incoming signing request request"
+
+    forM mMeta $ \meta -> uiGroup "segment" $ do
+      dialogSectionHeading mempty "dApp metadata"
+      showMetaData meta
+
+    uiGroup "segment" $ do
+      text $ "Error : " <> T.pack err
+
+    uiGroup "segment" $ do
+      el "p" $ text $ "Method : " <> method
+      el "p" $ text $ "Params : "
+      el "p" $ text (decodeUtf8 . toStrict $ encode params)
     uiButton btnCfgTertiary $ text "Close"
   pure (mempty, leftmost [onClose, doneEv])
 

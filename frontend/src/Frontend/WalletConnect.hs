@@ -37,6 +37,7 @@ setupWalletConnect :: (_)
   => m (WalletConnect t
      , m (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
      , m (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
+     , Event t (Maybe Metadata, String, Request)
      )
 setupWalletConnect = do
   walletConnect <- initWalletConnect Nothing "Kadena"
@@ -47,26 +48,17 @@ setupWalletConnect = do
         mMeta = snd . _session_peer <$> M.lookup t sessions
         resp :: (A.ToJSON b) => Either a b -> JSM ()
         resp = either (const $ reply $ Left ()) (reply . Right . A.toJSON)
-      in case A.fromJSON (_request_params req) of
-        A.Success r -> Right (Left ((r, mMeta), resp))
-        A.Error e1 -> case A.fromJSON (_request_params req) of
-          A.Success r -> Right (Right ((r, mMeta), resp))
-          A.Error e2 -> Left (e1, e2)
+      in if (_request_method req == "kadena_sign")
+         then case A.fromJSON (_request_params req) of
+           A.Success r -> Right (Left ((r, mMeta), resp))
+           A.Error e -> Left (mMeta, e, req)
+         else case A.fromJSON (_request_params req) of
+           A.Success r -> Right (Right ((r, mMeta), resp))
+           A.Error e -> Left (mMeta, e, req)
     sucEv = fmapMaybe (either (const Nothing) Just) ev
-    errEv = fmapMaybe (either Just (const Nothing)) ev
     signingEv = fmapMaybe (either Just (const Nothing)) sucEv
     quickSignEv = fmapMaybe (either (const Nothing) Just) sucEv
-
-  performEvent $ ffor (_walletConnect_requests walletConnect) $ \(t, req, reply) -> liftIO $ do
-    putStrLn $ "Recieved request"
-    putStrLn $ show $ _request_params req
-
-  performEvent $ ffor quickSignEv $ \(r, _) -> liftIO $ do
-    putStrLn $ "Recieved quicksign request"
-    putStrLn $ show $ _quickSignRequest_commands $ fst r
-  performEvent $ ffor errEv $ \(e1, e2) -> liftIO $ do
-    putStrLn $ "Error in request decoding: e1: " <> e1
-    putStrLn $ "Error in request decoding: e2: " <> e2
+    errEv = fmapMaybe (either Just (const Nothing)) ev
 
   signingHandler <- mkBufferedFRPHandler signingEv
   quickSignHandler <- mkBufferedFRPHandler quickSignEv
@@ -98,7 +90,7 @@ setupWalletConnect = do
     (pure . (\e -> "Error in obtaining notification permission: " <> show e))
   -- TODO log txtEv
 
-  pure (walletConnect, signingHandler, quickSignHandler)
+  pure (walletConnect, signingHandler, quickSignHandler, errEv)
 
 handleWalletConnectPairings pubKeys network walletConnect = do
   let

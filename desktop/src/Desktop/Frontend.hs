@@ -215,7 +215,7 @@ bipWallet fileFFI signingReqEv mkAppCfg = do
                 { _keyPair_publicKey = pub
                 , _keyPair_privateKey = Just newPrv
                 }
-          Frontend.App.app sidebarLogoutLink frontendFileFFI $ mkAppCfg $ EnabledSettings
+          Frontend.App.app sidebarLogoutLink frontendFileFFI never $ mkAppCfg $ EnabledSettings
             { _enabledSettings_changePassword = Just $ ChangePassword
               { _changePassword_requestChange =
                 let doChange (Identity (oldRoot, _)) (Password oldPass, Password newPass, Password repeatPass)

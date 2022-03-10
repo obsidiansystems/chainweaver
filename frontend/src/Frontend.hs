@@ -93,9 +93,9 @@ frontend = Frontend
             , _fileFFI_deliverFile = triggerFileDownload
             }
 
-      (walletConnect, signingHandler, quickSignHandler) <-
+      (walletConnect, signingHandler, quickSignHandler, wcSignReqErrEv) <-
         setupWalletConnect
-      bipWalletBrowser fileFFI walletConnect $ \enabledSettings -> AppCfg
+      bipWalletBrowser fileFFI walletConnect wcSignReqErrEv $ \enabledSettings -> AppCfg
         { _appCfg_gistEnabled = False
         , _appCfg_loadEditor = loadEditorFromLocalStorage
         , _appCfg_editorReadOnly = False

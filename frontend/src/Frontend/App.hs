@@ -44,7 +44,7 @@ import Reflex.Dom.ACE.Extended hiding (Annotation (..))
 import Reflex.Dom.Core
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import WalletConnect.Wallet (doNewPairing)
+import WalletConnect.Wallet (doNewPairing, Metadata, Request)
 
 import Common.OAuth (OAuthProvider (OAuthProvider_GitHub))
 import Common.Route
@@ -68,6 +68,7 @@ import Frontend.UI.Dialogs.DeployConfirmation (uiDeployConfirmation)
 import Frontend.UI.Dialogs.LogoutConfirmation (uiLogoutConfirmation)
 import Frontend.UI.Dialogs.NetworkEdit (uiNetworkSelectTopBar)
 import Frontend.UI.Dialogs.Signing (uiSigning, uiQuickSign)
+import Frontend.UI.Dialogs.WalletConnect (uiWalletConnectSigReqError)
 import Frontend.UI.IconGrid (IconGridCellConfig(..), iconGridLaunchLink)
 import Frontend.UI.Modal
 import Frontend.UI.Modal.Impl
@@ -94,9 +95,10 @@ app
   => RoutedT t (R FrontendRoute) m ()
   -- ^ Extra widget to display at the bottom of the sidebar
   -> FileFFI t (RoutedT t (R FrontendRoute) m)
+  -> Event t (Maybe Metadata, String, WalletConnect.Wallet.Request)
   -> AppCfg key t (RoutedT t (R FrontendRoute) m)
   -> RoutedT t (R FrontendRoute) m ()
-app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorage @key) $ void . mfix $ \ cfg -> do
+app sidebarExtra fileFFI wcSignReqErrEv appCfg = Store.versionedFrontend (Store.versionedStorage @key) $ void . mfix $ \ cfg -> do
   ideL <- makeIde fileFFI appCfg cfg
   signingReq <- _appCfg_signingHandler appCfg
   quickSignReq <- _appCfg_quickSignHandler appCfg
@@ -220,6 +222,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
     onQuickSignModal = Just . uiQuickSign ideL <$> quickSignReq
     signingModalCfg = mempty & modalCfg_setModal .~ onSigningModal
     quickSignModalCfg = mempty & modalCfg_setModal .~ onQuickSignModal
+    wcErrModalCfg = mempty & modalCfg_setModal .~ (Just . uiWalletConnectSigReqError <$> wcSignReqErrEv)
     wcModalCfg = maybe mempty (\v -> mempty & modalCfg_setModal .~ (Just <$> v)) wcModals
 
   pure $ mconcat
@@ -228,6 +231,7 @@ app sidebarExtra fileFFI appCfg = Store.versionedFrontend (Store.versionedStorag
     , gistModalCfg
     , signingModalCfg
     , quickSignModalCfg
+    , wcErrModalCfg
     , wcModalCfg
     , mempty & ideCfg_editor . editorCfg_loadCode .~ (snd <$> _fileFFI_externalFileOpened fileFFI)
     ]

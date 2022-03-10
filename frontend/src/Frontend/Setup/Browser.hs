@@ -91,9 +91,10 @@ bipWalletBrowser
      )
   => FileFFI t m
   -> WalletConnect t
+  -> Event t (Maybe Metadata, String, WalletConnect.Wallet.Request)
   -> MkAppCfg t m
   -> RoutedT t (R FrontendRoute) m ()
-bipWalletBrowser fileFFI walletConnect mkAppCfg = do
+bipWalletBrowser fileFFI walletConnect wcSignReqErrEv mkAppCfg = do
   txLogger <- askTransactionLogger
   let
     changePasswordBrowserAction i newRoot newPass = do
@@ -161,7 +162,7 @@ bipWalletBrowser fileFFI walletConnect mkAppCfg = do
 
           (updates, trigger) <- newTriggerEvent
           let frontendFileFFI = liftFileFFI (lift . lift) fileFFI
-          App.app sidebarLogoutLink frontendFileFFI $ mkAppCfg $
+          App.app sidebarLogoutLink frontendFileFFI wcSignReqErrEv $ mkAppCfg $
             appSettingsBrowser txLogger frontendFileFFI trigger details updates changePasswordBrowserAction walletConnect
 
           setRoute $ landingPageRoute <$ onLogoutConfirm
