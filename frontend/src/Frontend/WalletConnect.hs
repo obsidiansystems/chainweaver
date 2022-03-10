@@ -85,6 +85,8 @@ setupWalletConnect = do
       , onshow = Nothing
       , options = defaultNotificationOptions
         { body = "Open your wallet to view and sign the transaction."
+        , icon = static @"img/favicon/favicon-96x96.png"
+        , badge = static @"img/favicon/favicon-16x16.png"
         }
       , contents = title
       }
