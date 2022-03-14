@@ -236,6 +236,7 @@ bipWallet fileFFI signingReqEv mkAppCfg = do
             , _enabledSettings_exportWallet =
               Just $ mkExportWallet txLogger frontendFileFFI details (Proxy :: Proxy (BIPStorage Crypto.XPrv))
             , _enabledSettings_transactionLog = True
+            , _enabledSettings_walletConnect = Nothing
             }
 
           setRoute $ landingPageRoute <$ onLogoutConfirm
