@@ -72,8 +72,10 @@ data AppCfg key t m = AppCfg
   -- ^ Initial code to load into editor
   , _appCfg_editorReadOnly :: Bool
   -- ^ Is the editor read only?
-  , _appCfg_signingHandler :: m (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
-  , _appCfg_quickSignHandler :: m (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
+  , _appCfg_signingHandler ::
+    m ( (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
+      , (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
+      )
   , _appCfg_enabledSettings :: EnabledSettings key t m
   , _appCfg_logMessage :: LogLevel -> LogStr -> IO ()
   -- ^ Logging Function
@@ -119,20 +121,3 @@ tryReadMVarTriggerEvent mvar = do
     trigger =<< tryReadMVar mvar
     threadDelay (seconds 1)
   pure $ fmapMaybe id e
-
-mkBufferedFRPHandler
-  :: (PerformEvent t m, MonadJSM m, TriggerEvent t m, MonadIO (Performable m))
-  => FRPHandler req res t -> m (m (FRPHandler req res t))
-mkBufferedFRPHandler ev = do
-  reqQueue <- liftIO newChan
-  performEvent $ ffor ev $ \v -> liftIO $ writeChan reqQueue v
-  pure $ do
-    readReq <- liftIO $ newEmptyMVar
-    writeResp <- liftIO $ newEmptyMVar
-    liftJSM $ forkJSM $ forever $ do
-      (req, respond) <- liftIO $ readChan reqQueue
-      resp <- liftIO $ do
-        putMVar readReq req
-        takeMVar writeResp
-      respond resp
-    mkFRPHandler (MVarHandler readReq writeResp)

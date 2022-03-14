@@ -93,13 +93,12 @@ frontend = Frontend
             , _fileFFI_deliverFile = triggerFileDownload
             }
 
-      (walletConnect, signingHandler, quickSignHandler, wcSignReqErrEv) <-
+      (walletConnect, signingHandler, wcSignReqErrEv) <-
         setupWalletConnect
       bipWalletBrowser fileFFI walletConnect wcSignReqErrEv $ \enabledSettings -> AppCfg
         { _appCfg_gistEnabled = False
         , _appCfg_loadEditor = loadEditorFromLocalStorage
         , _appCfg_editorReadOnly = False
-        , _appCfg_quickSignHandler = mapRoutedT lift quickSignHandler
         , _appCfg_signingHandler = mapRoutedT lift signingHandler
         , _appCfg_enabledSettings = enabledSettings
         , _appCfg_logMessage = errorLevelLogger

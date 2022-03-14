@@ -28,15 +28,17 @@ import Kadena.SigningApi
 
 import WalletConnect.Wallet
 import Frontend.AppCfg
+import Frontend.Foundation hiding (Request)
 import Frontend.Wallet (accountKeys, unAccountData)
 import Frontend.UI.Dialogs.WalletConnect
-import Reflex.Notifications
+import Reflex.Notifications hiding (tag)
 import Common.Wallet
 
 setupWalletConnect :: (_)
   => m (WalletConnect t
-     , m (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
-     , m (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
+     , m ( (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
+         , (FRPHandler (QuickSignRequest, Maybe Metadata) QuickSignResponse t)
+         )
      , Event t (Maybe Metadata, String, Request)
      )
 setupWalletConnect = do
@@ -60,8 +62,45 @@ setupWalletConnect = do
     quickSignEv = fmapMaybe (either (const Nothing) Just) sucEv
     errEv = fmapMaybe (either Just (const Nothing)) ev
 
-  signingHandler <- mkBufferedFRPHandler signingEv
-  quickSignHandler <- mkBufferedFRPHandler quickSignEv
+  -- The following code ensures that a queue of incoming signing requests is
+  -- maintained, so that multiple incoming request events dont override the
+  -- modal while the user is in the process of doing signing, and also to ensure
+  -- that when the wallet is locked the signing requests are stored in memory.
+  -- Once the wallet is unlocked the signing request events are emitted 'one at
+  -- a time', ie it waits for the user to respond to the request, and after a
+  -- delay fires the event of next request in the queue.
+  signingHandler <- do
+    let ev = leftmost [Left <$> signingEv, Right <$> quickSignEv]
+    addEv <- numberOccurrences (Just <$> ev)
+    (removeEv, removeAction) <- newTriggerEvent
+    pendingMsgs <- foldDyn (\(k,v) -> M.alter (const v) k) mempty $
+      leftmost [addEv, removeEv]
+    pure $ mdo
+      pb <- delay 0 =<< getPostBuild
+      recheckEv <- delay 1 $
+        leftmost [ () <$ removeEv
+                 , fmapMaybe (bool Nothing (Just ())) isEmptyEv
+                 ]
+      let
+        msgsEv = attach (current lastReq) $ tag (current pendingMsgs) $
+          leftmost [recheckEv, pb]
+
+        isEmptyEv = M.null . snd <$> msgsEv -- does retrigger after delay
+
+        makeReqEv (mLast, m) = triggerRemove mLast =<< M.lookupMin m
+
+        triggerRemove mLast (i, eitherV) =
+          let
+            doRemove :: (_) => _ -> _
+            doRemove (req, resp) = (req,) $ \v ->
+              (liftIO $ removeAction (i, Nothing)) >> resp v
+          in if mLast < Just i
+            then Just (i, bimap doRemove doRemove eitherV)
+            else Nothing
+
+        reqEv = fmapMaybe makeReqEv msgsEv
+      lastReq <- holdDyn Nothing (Just . fst <$> reqEv)
+      pure $ fanEither $ snd <$> reqEv
 
   askPermissionEv <- delay 0 =<< getPostBuild
   let
@@ -90,7 +129,7 @@ setupWalletConnect = do
     (pure . (\e -> "Error in obtaining notification permission: " <> show e))
   -- TODO log txtEv
 
-  pure (walletConnect, signingHandler, quickSignHandler, errEv)
+  pure (walletConnect, signingHandler, errEv)
 
 handleWalletConnectPairings pubKeys network walletConnect = do
   let

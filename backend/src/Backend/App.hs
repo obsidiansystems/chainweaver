@@ -211,8 +211,7 @@ main' ffi mainBundleResourcePath runHTML = do
                   , _appCfg_loadEditor = loadEditorFromLocalStorage
                   -- DB 2019-08-07 Changing this back to False because it's just too convenient this way.
                   , _appCfg_editorReadOnly = False
-                  , _appCfg_signingHandler = mkFRPHandler signingHandler
-                  , _appCfg_quickSignHandler = mkFRPHandler quickSignHandler
+                  , _appCfg_signingHandler = (,) <$> mkFRPHandler signingHandler <*> mkFRPHandler quickSignHandler
                   , _appCfg_enabledSettings = enabledSettings
                   , _appCfg_logMessage = _appFFI_global_logFunction ffi
                   }

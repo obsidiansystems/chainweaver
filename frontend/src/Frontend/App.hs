@@ -100,8 +100,7 @@ app
   -> RoutedT t (R FrontendRoute) m ()
 app sidebarExtra fileFFI wcSignReqErrEv appCfg = Store.versionedFrontend (Store.versionedStorage @key) $ void . mfix $ \ cfg -> do
   ideL <- makeIde fileFFI appCfg cfg
-  signingReq <- _appCfg_signingHandler appCfg
-  quickSignReq <- _appCfg_quickSignHandler appCfg
+  (signingReq, quickSignReq) <- _appCfg_signingHandler appCfg
   let mWalletConnect = _enabledSettings_walletConnect (_appCfg_enabledSettings appCfg)
   sigPopup <- walletSidebar sidebarExtra
   updates <- divClass "page" $ do
