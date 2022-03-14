@@ -129,12 +129,6 @@ bipWalletBrowser fileFFI walletConnect wcSignReqErrEv mkAppCfg = do
         Nothing -> LockScreen_RunSetup :=> Identity ()
         Just xprv -> LockScreen_Locked ==> xprv
 
-  initRouteIsWalletConnect <- do
-    initRoute <- sample . current =<< askRoute
-    return $ case initRoute of
-      FrontendRoute_WalletConnect :/ _ -> True
-      _ -> False
-
   rec
     -- Which screen we are on, along with extra information
     whichScreen <- factorDyn =<< holdDyn initScreen updateScreen
@@ -145,9 +139,14 @@ bipWalletBrowser fileFFI walletConnect wcSignReqErrEv mkAppCfg = do
       LockScreen_RunSetup :=> _ -> runSetup0 Nothing WalletExists_No
       -- Wallet exists but the lock screen is active
       LockScreen_Locked :=> Compose root -> do
+        isWc <- do
+          curRoute <- sample . current =<< askRoute
+          return $ case curRoute of
+            FrontendRoute_WalletConnect :/ _ -> True
+            _ -> False
         let signingReqEv = () <$ _walletConnect_requests walletConnect
         (restore, mLogin) <- lockScreenWidget signingReqEv passwordRoundTripTest
-          initRouteIsWalletConnect $ fmap runIdentity $ current root
+          isWc $ fmap runIdentity $ current root
         pure $ leftmost
           [ (LockScreen_Restore ==>) . runIdentity <$> current root <@ restore
           , (LockScreen_Unlocked ==>) <$> attach (runIdentity <$> current root) mLogin
