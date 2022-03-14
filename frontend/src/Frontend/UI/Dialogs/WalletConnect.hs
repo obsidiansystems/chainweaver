@@ -59,7 +59,7 @@ uiWalletConnectSessionProposal
   => ([PublicKey], (NetworkName, Proposal))
   -> Event t ()
   -> m (mConf, Event t ())
-uiWalletConnectSessionProposal (keys, (networkName, Proposal _ (_, meta) _ respond)) _ = do
+uiWalletConnectSessionProposal (keys, (networkName, Proposal _ ttl (_, meta) _ respond)) _ = do
   onClose <- modalHeader $ text "Wallet Connect Session"
 
   doneEv <- modalMain $ uiSegment mempty $ do
@@ -102,7 +102,7 @@ uiWalletConnectSessionPermissionError
   => ([Method], [Chain], NetworkName, Proposal)
   -> Event t ()
   -> m (mConf, Event t ())
-uiWalletConnectSessionPermissionError (methods, chains, networkName, Proposal _ (_, meta) _ respond) _ = do
+uiWalletConnectSessionPermissionError (methods, chains, networkName, Proposal _ _ (_, meta) _ respond) _ = do
   onClose <- modalHeader $ text "Wallet Connect Session"
 
   doneEv <- modalMain $ uiSegment mempty $ do

@@ -52,6 +52,7 @@ data Session = Session
 
 data Proposal = Proposal
   { _proposal_topic :: Topic
+  , _proposal_ttl :: Int
   , _proposal_proposer :: (PublicKey, Metadata)
   , _proposal_permissions :: Permissions
   , _proposal_approval :: (Either () [Account] -> JSM ())
@@ -162,9 +163,10 @@ subscribeToEvents clientMVar reqAction proposalAction sessionAction pairingsActi
       logValue proposal
       topic <- valToText =<< proposal ! "topic"
       permissions <- getPermissions proposal
+      ttl <- fromJSValUnchecked =<< proposal ! "ttl"
       proposer <- do
         getMetadataPublicKey =<< proposal ! "proposer"
-      liftIO $ proposalAction $ Proposal topic proposer permissions (either (doReject proposal) (doApprove proposal))
+      liftIO $ proposalAction $ Proposal topic ttl proposer permissions (either (doReject proposal) (doApprove proposal))
 
     doReject proposal _ = do
       args <- do
