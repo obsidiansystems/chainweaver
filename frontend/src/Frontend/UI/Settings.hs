@@ -64,7 +64,7 @@ uiSettings enabledSettings model fileFFI = elClass "div" "icon-grid" $ do
     , ffor (_enabledSettings_exportWallet enabledSettings) $ \exportWallet-> do
       settingItem "Export Wallet" (static @"img/export.svg") (uiExportWalletDialog exportWallet)
     , ffor (_enabledSettings_walletConnect enabledSettings) $ \walletConnect -> do
-      settingItem "Wallet Connect" (static @"img/export.svg") (uiWalletConnect walletConnect)
+      settingItem "Wallet Connect" (static @"img/WalletConnect.svg") (uiWalletConnect walletConnect)
     , includeSetting _enabledSettings_transactionLog $ settingItem "Transaction Log" (static @"img/transaction-logs.svg")
         $ uiTxLogs fileFFI
     ]
