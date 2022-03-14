@@ -90,7 +90,8 @@ newMVarHandler :: IO (MVarHandler req res)
 newMVarHandler = MVarHandler <$> newEmptyMVar <*> newEmptyMVar
 
 mkFRPHandler
-  :: (PerformEvent t m, TriggerEvent t m, MonadIO m)
+  :: (PerformEvent t m, TriggerEvent t m, MonadIO m
+     , MonadIO (Performable m))
   => MVarHandler req res -> m (FRPHandler req res t)
 mkFRPHandler (MVarHandler reqMVar resMVar) = do
   reqs <- takeMVarTriggerEvent reqMVar
@@ -98,11 +99,13 @@ mkFRPHandler (MVarHandler reqMVar resMVar) = do
   pure $ (\r -> (r, resp)) <$> reqs
 
 takeMVarTriggerEvent
-  :: (PerformEvent t m, TriggerEvent t m, MonadIO m)
+  :: (PerformEvent t m, TriggerEvent t m, MonadIO m
+     , MonadIO (Performable m))
   => MVar a -> m (Event t a)
 takeMVarTriggerEvent mvar = do
+  readEv <- tryReadMVarTriggerEvent mvar
   (e, trigger) <- newTriggerEvent
-  _ <- liftIO $ forkIO $ forever $ do
+  performEvent_ $ ffor readEv $ \_ -> liftIO $
     trigger =<< takeMVar mvar
   pure e
 
