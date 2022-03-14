@@ -10,6 +10,8 @@ import Control.Monad (join, void, forM_, forM, unless)
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time.LocalTime.Compat
+import Data.Time.Format.ISO8601.Compat
 import Reflex.Dom hiding (Request)
 import Language.Javascript.JSaddle (valToJSON, liftJSM, JSM, fun, jsg, js0)
 import Data.ByteString.Lazy (toStrict, fromStrict)
@@ -79,6 +81,11 @@ uiWalletConnectSessionProposal (keys, (networkName, Proposal _ ttl (_, meta) _ r
     uiGroup "segment" $ do
       dialogSectionHeading mempty "dApp metadata"
       showMetaData meta
+
+      el "p" $ do
+        text "Duration: "
+        text $ T.pack $ formatShow (alternativeDurationTimeFormat ExtendedFormat) (calendarTimeTime $ fromIntegral ttl)
+
       let
         cfg = btnCfgPrimary
           & uiButtonCfg_disabled .~ fmap null dSelAccs

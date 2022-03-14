@@ -97,6 +97,7 @@ library
     , these
     , these-lens
     , time
+    , time-compat
     , transformers
     , trifecta
     , universe
