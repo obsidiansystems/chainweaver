@@ -64,7 +64,7 @@ import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T
 import           Language.Javascript.JSaddle (JSM, MonadJSM, liftJSM)
 import           Reflex.Dom.Class            (HasJSContext (..))
-import           Reflex.Dom.Xhr
+import           Reflex.Dom.Xhr hiding (newXMLHttpRequestWithError)
 import           Safe                        (fromJustNote, maximumMay)
 import           Text.URI                    (URI (URI))
 import qualified Text.URI                    as URI hiding (uriPath)
@@ -79,6 +79,21 @@ import           Common.Network              (ChainId (..), ChainRef (..),
                                               NodeRef (..), parseNodeRef)
 import           Frontend.Foundation
 
+-- Imports for newXMLHttpRequestWithError
+import Control.Concurrent (forkIO)
+import Control.Exception (handle)
+import qualified Data.CaseInsensitive as CI
+import Data.Default
+import qualified Data.List as L
+import Data.Map (Map)
+import qualified Data.Map as Map
+import GHCJS.DOM.XMLHttpRequest
+import GHCJS.DOM.Enums
+import qualified Language.Javascript.JSaddle.Monad as JS (catch)
+import GHCJS.DOM.Types (ToJSString, Blob(..), castTo)
+import Language.Javascript.JSaddle.Helper (mutableArrayBufferFromJSVal)
+import Foreign.JavaScript.Utils (bsFromMutableArrayBuffer, bsToArrayBuffer)
+import Control.Exception (throwIO)
 
 data ChainwebInfo = ChainwebInfo
   { _chainwebInfo_version        :: Text
@@ -318,3 +333,103 @@ mkSafeReq uri = case uri ^. uriAuthority ^? _Right . authPort of
   _ -> Right $ SafeXhrRequest $ xhrRequest "GET" (URI.render uri) def
   where
     maxPort = 2^(16 :: Word) - 1
+
+-- The below code has been copied from Reflex.Dom.Xhr.* modules as it is not exported
+
+newXMLHttpRequestWithError
+    :: (HasJSContext m, MonadJSM m, IsXhrPayload a)
+    => XhrRequest a
+    -- ^ The request to make.
+    -> (Either XhrException XhrResponse -> JSM ())
+    -- ^ A continuation to be called once a response comes back, or in
+    -- case of error.
+    -> m XMLHttpRequest
+    -- ^ The XHR request, which could for example be aborted.
+newXMLHttpRequestWithError req cb = do
+  xhr <- xmlHttpRequestNew
+  ctx <- askJSM
+  void $ liftIO $ forkIO $ handle ((`runJSM` ctx) . cb . Left) $ void . (`runJSM` ctx) $ do
+    let c = _xhrRequest_config req
+        rt = _xhrRequestConfig_responseType c
+        creds = _xhrRequestConfig_withCredentials c
+    xmlHttpRequestOpen
+      xhr
+      (_xhrRequest_method req)
+      (_xhrRequest_url req)
+      True
+      (fromMaybe "" $ _xhrRequestConfig_user c)
+      (fromMaybe "" $ _xhrRequestConfig_password c)
+    iforM_ (_xhrRequestConfig_headers c) $ xmlHttpRequestSetRequestHeader xhr
+    maybe (return ()) (setResponseType xhr . fromResponseType) rt
+    setWithCredentials xhr creds
+    _ <- xmlHttpRequestOnreadystatechange xhr $ do
+      readyState <- xmlHttpRequestGetReadyState xhr
+      status <- xmlHttpRequestGetStatus xhr
+      statusText <- xmlHttpRequestGetStatusText xhr
+      when (readyState == 4) $ do
+        t <- if rt == Just XhrResponseType_Text || isNothing rt
+             then xmlHttpRequestGetResponseText xhr
+             else return Nothing
+        r <- xmlHttpRequestGetResponse xhr
+        h <- case _xhrRequestConfig_responseHeaders c of
+          AllHeaders -> parseAllHeadersString <$>
+            getAllResponseHeaders xhr
+          OnlyHeaders xs -> traverse (xmlHttpRequestGetResponseHeader xhr)
+            (Map.fromSet CI.original xs)
+        _ <- liftJSM $ cb $ Right
+             XhrResponse { _xhrResponse_status = status
+                         , _xhrResponse_statusText = statusText
+                         , _xhrResponse_response = r
+                         , _xhrResponse_responseText = t
+                         , _xhrResponse_headers = h
+                         }
+        return ()
+    _ <- xmlHttpRequestSend xhr (_xhrRequestConfig_sendData c)
+    return ()
+  return xhr
+
+fromResponseType :: XhrResponseType -> XMLHttpRequestResponseType
+fromResponseType XhrResponseType_Default = XMLHttpRequestResponseType
+fromResponseType XhrResponseType_ArrayBuffer = XMLHttpRequestResponseTypeArraybuffer
+fromResponseType XhrResponseType_Blob = XMLHttpRequestResponseTypeBlob
+fromResponseType XhrResponseType_Text = XMLHttpRequestResponseTypeText
+
+xmlHttpRequestGetResponse :: MonadJSM m => XMLHttpRequest -> m (Maybe XhrResponseBody)
+xmlHttpRequestGetResponse xhr = do
+  mr <- getResponse xhr
+  rt <- xmlHttpRequestGetResponseType xhr
+  case rt of
+       Just XhrResponseType_Blob -> fmap XhrResponseBody_Blob <$> castTo Blob mr
+       Just XhrResponseType_Text -> Just . XhrResponseBody_Text <$> xmlHttpRequestGetStatusText xhr
+       Just XhrResponseType_Default -> Just . XhrResponseBody_Text <$> xmlHttpRequestGetStatusText xhr
+       Just XhrResponseType_ArrayBuffer -> do
+           ab <- liftJSM $ mutableArrayBufferFromJSVal mr
+           Just . XhrResponseBody_ArrayBuffer <$> bsFromMutableArrayBuffer ab
+       _ -> return Nothing
+
+parseAllHeadersString :: Text -> Map (CI.CI Text) Text
+parseAllHeadersString s = Map.fromList $ fmap (stripBoth . T.span (/=':')) $
+  L.dropWhileEnd T.null $ T.splitOn (T.pack "\r\n") s
+  where stripBoth (txt1, txt2) = (CI.mk $ T.strip txt1, T.strip $ T.drop 1 txt2)
+
+xmlHttpRequestSend :: IsXhrPayload payload => XMLHttpRequest -> payload -> JSM ()
+xmlHttpRequestSend self p = sendXhrPayload self p `JS.catch` (liftIO . throwIO . convertException)
+
+xmlHttpRequestGetResponseType :: MonadJSM m => XMLHttpRequest -> m (Maybe XhrResponseType)
+xmlHttpRequestGetResponseType = fmap toResponseType . getResponseType
+
+xmlHttpRequestGetResponseHeader :: (ToJSString header, MonadJSM m)
+                                => XMLHttpRequest -> header -> m Text
+xmlHttpRequestGetResponseHeader self header = fromMaybe "" <$> getResponseHeader self header
+
+convertException :: XHRError -> XhrException
+convertException e = case e of
+  XHRError -> XhrException_Error
+  XHRAborted -> XhrException_Aborted
+
+toResponseType :: XMLHttpRequestResponseType -> Maybe XhrResponseType
+toResponseType XMLHttpRequestResponseType = Just XhrResponseType_Default
+toResponseType XMLHttpRequestResponseTypeArraybuffer = Just XhrResponseType_ArrayBuffer
+toResponseType XMLHttpRequestResponseTypeBlob = Just XhrResponseType_Blob
+toResponseType XMLHttpRequestResponseTypeText = Just XhrResponseType_Text
+toResponseType _ = Nothing
