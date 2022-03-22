@@ -352,16 +352,6 @@ newXMLHttpRequestWithError req cb = do
     let c = _xhrRequest_config req
         rt = _xhrRequestConfig_responseType c
         creds = _xhrRequestConfig_withCredentials c
-    xmlHttpRequestOpen
-      xhr
-      (_xhrRequest_method req)
-      (_xhrRequest_url req)
-      True
-      (fromMaybe "" $ _xhrRequestConfig_user c)
-      (fromMaybe "" $ _xhrRequestConfig_password c)
-    iforM_ (_xhrRequestConfig_headers c) $ xmlHttpRequestSetRequestHeader xhr
-    maybe (return ()) (setResponseType xhr . fromResponseType) rt
-    setWithCredentials xhr creds
     _ <- xmlHttpRequestOnreadystatechange xhr $ do
       readyState <- xmlHttpRequestGetReadyState xhr
       status <- xmlHttpRequestGetStatus xhr
@@ -384,6 +374,16 @@ newXMLHttpRequestWithError req cb = do
                          , _xhrResponse_headers = h
                          }
         return ()
+    xmlHttpRequestOpen
+      xhr
+      (_xhrRequest_method req)
+      (_xhrRequest_url req)
+      True
+      (fromMaybe "" $ _xhrRequestConfig_user c)
+      (fromMaybe "" $ _xhrRequestConfig_password c)
+    iforM_ (_xhrRequestConfig_headers c) $ xmlHttpRequestSetRequestHeader xhr
+    maybe (return ()) (setResponseType xhr . fromResponseType) rt
+    setWithCredentials xhr creds
     _ <- xmlHttpRequestSend xhr (_xhrRequestConfig_sendData c)
     return ()
   return xhr
