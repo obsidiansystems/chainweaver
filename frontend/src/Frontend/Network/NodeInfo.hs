@@ -87,6 +87,7 @@ import Data.Default
 import qualified Data.List as L
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Time
 import GHCJS.DOM.XMLHttpRequest
 import GHCJS.DOM.Enums
 import qualified Language.Javascript.JSaddle.Monad as JS (catch)
@@ -294,7 +295,14 @@ runReq
 runReq (SafeXhrRequest req) = do
   resp <- newEmptyMVar
   void $ newXMLHttpRequestWithErrorSane req (liftIO . putMVar resp)
-  takeMVar resp
+  liftIO $ do
+    t <- getCurrentTime
+    putStrLn $ "runReq : waiting for " <> show ((_xhrRequest_url req), t)
+  v <- takeMVar resp
+  liftIO $ do
+    t <- getCurrentTime
+    putStrLn $ "runReq : done " <> show ((_xhrRequest_url req), t)
+  pure v
 
 
 -- Sane version of newXMLHttpRequestWithError: Report all errors via callback,
@@ -348,12 +356,18 @@ newXMLHttpRequestWithError
 newXMLHttpRequestWithError req cb = do
   xhr <- xmlHttpRequestNew
   ctx <- askJSM
+  liftIO $ do
+    t <- getCurrentTime
+    putStrLn $ "newXHR :" <> show ((_xhrRequest_url req), t)
   void $ liftIO $ forkIO $ handle ((`runJSM` ctx) . cb . Left) $ void . (`runJSM` ctx) $ do
     let c = _xhrRequest_config req
         rt = _xhrRequestConfig_responseType c
         creds = _xhrRequestConfig_withCredentials c
     _ <- xmlHttpRequestOnreadystatechange xhr $ do
       readyState <- xmlHttpRequestGetReadyState xhr
+      liftIO $ do
+        t <- getCurrentTime
+        putStrLn $ "From onreadystatechange :" <> show ((_xhrRequest_url req), readyState, t)
       status <- xmlHttpRequestGetStatus xhr
       statusText <- xmlHttpRequestGetStatusText xhr
       when (readyState == 4) $ do
