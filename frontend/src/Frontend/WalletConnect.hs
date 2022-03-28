@@ -34,6 +34,9 @@ import Frontend.UI.Dialogs.WalletConnect
 import Reflex.Notifications hiding (tag)
 import Common.Wallet
 
+walletConnectProjectId :: Text
+walletConnectProjectId = "2155753170ee50854f546620185aeaed"
+
 setupWalletConnect :: (_)
   => m (WalletConnect t
      , m ( (FRPHandler (SigningRequest, Maybe Metadata) SigningResponse t)
@@ -42,7 +45,7 @@ setupWalletConnect :: (_)
      , Event t (Maybe Metadata, String, Request)
      )
 setupWalletConnect = do
-  walletConnect <- initWalletConnect Nothing "Kadena"
+  walletConnect <- initWalletConnect Nothing walletConnectProjectId
   let
     ev0 = attach (current $ _walletConnect_sessions walletConnect) (_walletConnect_requests walletConnect)
     ev = ffor ev0 $ \(sessions, (t, req, reply)) ->
